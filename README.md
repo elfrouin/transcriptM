@@ -1,11 +1,11 @@
 # transcriptM
 
 ## Overview
-* Process several sets of metatranscriptomic paired-end reads (sequenced with Illumina)
+* **Process several sets of metatranscriptomic paired-end reads (sequenced with Illumina)**
   - Quality trimming
   - PhiX reads removal
   - rRNA, tRNA and tmRNA removal
-* Complete metagenomics analysis
+* **Complete metagenomics analysis**
   - Map processed metatranscriptomic reads against metagenomic contigs
   - [Remove reads which mapped with low stringency]
   - Compute coverage of annotated genes from several population genomes (= bins, sets of metagenomic contigs that might represent individual genome)
@@ -62,6 +62,7 @@ optional arguments:
   --min_qc MIN_QC       Minimum quality score for leading and trailing bases (default = 20)
   --crop CROP           Cut read to a specific length (default = 10000)
   --headcrop HEADCROP   Cut specified number of bases from start of read (default=0)
+  
   
   SortMeRNA options:
   --path_db_smr PATH_DB_SMR
