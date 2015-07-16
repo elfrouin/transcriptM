@@ -23,20 +23,27 @@ if __name__ == '__main__':
     parser = cmdline.get_argparse(description='''
     WHAT DOES THIS PIPELINE DO? \n
     process metatranscriptomic data and complete metagenomics analysis\n
-    ex: transcriptm --paired_end sample1-R1.fq.gz sample1-R2.fq.gz sample2-R1.fq.gz sample2-R2.fq.gz --metaG_contigs assembly.fa --dir_bins dir_gff
+    e.g. transcriptm --paired_end sample1-R1.fq.gz sample1-R2.fq.gz sample2-R1.fq.gz sample2-R2.fq.gz --metaG_contigs assembly.fa --dir_bins dir_gff
     ''')
 
     # Options   
-    parser.add_argument("--paired_end",nargs="+", dest="paired_end", help="Input files: paired sequence files of raw metatranscriptomics reads (.fq.gz format)  EX: --paired_end reads1_1.fq.gz reads1_2.fq.gz reads2_1.fq.gz reads2_2.fq.gz",required=True)
+    parser.add_argument("--paired_end",nargs="+", dest="paired_end", help="Input files: paired sequence files of raw metatranscriptomics reads (.fq.gz format)  e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz",required=True)
     parser.add_argument("--metaG_contigs", dest="metaG_contigs", help="fasta file which contain all contigd from the reference metagenome",required=True)
     parser.add_argument("--dir_bins", dest="dir_bins", help="Directory which contains several annotated bins (gff format, the others files would be ignored)",required=True)
     parser.add_argument("--threads", dest="threads", help="number of threads to use (default=20)", default=20)
+    
+    # check if the db is an environment variable
+    db_path=None    
     try :
-        parser.add_argument("--db_path", dest="db_path", help="Directory which contains the TranscriptM databases (default: /svr/db/transcriptm)", default= os.environ['TRANSCRIPTM_DATABASE'])
+        db_path= os.environ['TRANSCRIPTM_DATABASE']
     except KeyError:
+        pass 
+    if db_path:
+        parser.add_argument("--db_path", dest="db_path", help="Directory which contains the TranscriptM databases (default: %s)"%(db_path), default= db_path)
+    else :
         parser.add_argument("--db_path", dest="db_path", help="Directory which contains the TranscriptM databases",required=True)
     parser.add_argument("--output_dir", dest="output_dir", help="Output directory (default: ./TranscriptM_output )", default='TranscriptM_output')
-    parser.add_argument("--keep_working_dir",action="store_true", dest="keep_working_dir", help="Keep all temporary files (in ./TranscriptM_temp)", default= False)
+    parser.add_argument("--working_dir", dest="working_dir", help="Keep all temporary files (default: /tmp )", default= tempdir.TempDir().name)
        
     # Trimmomatic
     trimm_args=parser.add_argument_group('Trimmomatic options')
@@ -62,25 +69,19 @@ if __name__ == '__main__':
         '%s/rfam-cyano_tmRNA.fa,%s/rfam-cyano_tmRNA-db:%s/rfam-mt_tmRNA.fa,%s/rfam-mt_tmRNA-db:'\
         '%s/rfam-tmRNA.fa,%s/rfam-tmRNA-db:%s/rfam-tRNA.fa,%s/rfam-tRNA-db:'\
         '%s/rfam-tRNA_Sec.fa,%s/rfam-tRNA_Sec-db'%((path_rRNA,path_index)*8+(path_tRNA,path_index)*7)
-        sortmerna_args.add_argument('--path_db_smr',help=" path to databases and index (created with the script sortmerna/2.0/bin/indexdb_rna)  EX: path_db1,path_index1:path_db2,path_index2 (default: rRNA and tRNA db)" ,default = db_smr)
+        sortmerna_args.add_argument('--path_db_smr',help=" path to databases and index (created with the script sortmerna/2.0/bin/indexdb_rna)  EX: path_db1,path_index1:path_db2,path_index2 (default: rRNA and tRNA db)",default = db_smr)
     except KeyError:
-        sortmerna_args.add_argument('--path_db_smr',help=" path to databases and index (created with the script sortmerna/2.0/bin/indexdb_rna)  EX: path_db1,path_index1:path_db2,path_index2" ,required=True)
+        sortmerna_args.add_argument('--path_db_smr',help=" path to databases and index (created with the script sortmerna/2.0/bin/indexdb_rna)  EX: path_db1,path_index1:path_db2,path_index2",required=True)
 
 
     # Mapping: BamM filter
     mapping_args=parser.add_argument_group('Mapping options (BamM filter)')
-    mapping_args.add_argument('--apply_filter',  action="store_true", dest='apply_filter', help='Adjust the mapping srtingengy by filtering alignments \n-> based on identity and aligned of each read (default=False)', default=False)
     mapping_args.add_argument('--percentage_id', type=float, dest='percentage_id', help=' minimum allowable percentage base identity of a mapped read (default=0.97)', default=0.97)
     mapping_args.add_argument('--percentage_aln', type=float, dest='percentage_aln', help='minimum allowable percentage read bases mapped (default=0.95)', default=0.95)
+    mapping_args.add_argument('--no_mapping_filter',  action="store_true", dest='no_mapping_filter', help='Adjust the mapping srtingengy by filtering alignments \n-> based on identity and aligned of each read (default=False)', default=False)
     
     args = parser.parse_args()
     
-    # create tempdir
-    if args.keep_working_dir:
-        tmpdir_name= "TranscriptM_temp/"
-    else :
-        t= tempdir.TempDir()
-        tmpdir_name= t.name
     # check if the SortMeRNA database is indexed
     if os.path.isdir(os.path.join(args.db_path,'1-SortMeRNA/')) and not os.path.isdir(os.path.join(args.db_path,'1-SortMeRNA/index')):
         path_rRNA = os.path.join(args.db_path,"1-SortMeRNA/rRNA_databases")
@@ -88,21 +89,19 @@ if __name__ == '__main__':
         path_index = os.path.join(args.db_path,"1-SortMeRNA/index")
         raise Exception ('No index found for SortMeRNA database.\n Use the cmdline below: \n sortmerna/2.0/bin/indexdb_rna --ref path_db1,path_index1:path_db2,path_index2 ')
         exit(1)
-            
+    
+    # check if mapping args are correct
+    if (args.percentage_id or args.percentage_aln) and args.no_mapping_filter:
+        raise Exception ("Error in mapping options: flags --percentage_id and --percentage_aln cannot be used with --no_mapping_filter ")
+        exit(1)
+        
     # log
     logger, logging_mutex = cmdline.setup_logging (__name__, args.log_file, args.verbose)
     
     # run the pipeline
-    run=Pipeline(args,tmpdir_name)
+    run=Pipeline(args)
     run.pipeline_stages()
     run.clear()
-    
-    # dissolve tempdir
-    try:    
-        t.dissolve()
-    except NameError:
-        pass
-
     
     
     

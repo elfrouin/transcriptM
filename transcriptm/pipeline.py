@@ -26,9 +26,8 @@ from monitoring import Monitoring
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
 class Pipeline :
-    def __init__(self,args,tmpdir):
+    def __init__(self,args):
         self.args=args
-        self.working_dir= tmpdir        
         
         ### db
         # adapters
@@ -53,8 +52,8 @@ class Pipeline :
         # prefix
         self.alias_pe = {}        
         for i in range(int(len(self.args.paired_end)/2)) :
-            self.alias_pe[os.path.join(self.working_dir,'sample-'+str(i)+'_R1.fq.gz')] =self.args.paired_end[2*i]
-            self.alias_pe[os.path.join(self.working_dir,'sample-'+str(i)+'_R2.fq.gz')] =self.args.paired_end[2*i+1]
+            self.alias_pe[os.path.join(self.args.working_dir,'sample-'+str(i)+'_R1.fq.gz')] =self.args.paired_end[2*i]
+            self.alias_pe[os.path.join(self.args.working_dir,'sample-'+str(i)+'_R2.fq.gz')] =self.args.paired_end[2*i+1]
         
         self.prefix_pe= {}
         for  i in range(int(len(self.args.paired_end)/2)) :
@@ -149,7 +148,7 @@ class Pipeline :
     # PIPELINE: STEP N_1
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # Create symbolic link of inputs files in the working directory
-        @mkdir(self.working_dir)
+        @mkdir(self.args.working_dir)
         @originate(self.alias_pe.keys(), self.logger, self.logging_mutex)
         def symlink_to_wd_metaT (soft_link_name, logger, logging_mutex):
             """
@@ -162,10 +161,10 @@ class Pipeline :
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
             
             
-        @mkdir(self.working_dir)        
+        @mkdir(self.args.working_dir)        
         @transform(self.args.metaG_contigs, formatter(),
                         # move to working directory
-                        os.path.join(self.working_dir,"{basename[0]}"+".fa"),
+                        os.path.join(self.args.working_dir,"{basename[0]}"+".fa"),
                         self.logger, self.logging_mutex)
         def symlink_to_wd_metaG (input_file, soft_link_name, logger, logging_mutex):
             """
@@ -210,8 +209,9 @@ class Pipeline :
             with logging_mutex:
                 logger.info("Trim and remove adapters of paired reads of %(input_files)s" % locals())
                 logger.debug("trimmomatic: cmdline\n"+ cmd)
-            subprocess.check_call(cmd, shell=True)    
-            
+            subprocess.check_call(cmd, shell=True)
+            print ('\t').join([self.prefix_pe[input_files[0].split('_R1.fq.gz')[0]],'FastQC-check','raw reads','val','100.0','100.0'])
+
           
        
         
@@ -231,7 +231,7 @@ class Pipeline :
                                                                                  input_files[1],
                                                                                  input_files[2],
                                                                                  input_files[3],
-                                                                                 self.working_dir,
+                                                                                 self.args.working_dir,
                                                                                  self.args.threads)
             with logging_mutex:
                 logger.info("Map reads against phiX genome")
@@ -378,7 +378,7 @@ class Pipeline :
                                                                             input_files[0][0],
                                                                             input_files[0][1],
                                                                             input_files[0][2],
-                                                                            self.working_dir,
+                                                                            self.args.working_dir,
                                                                             self.args.threads,
                                                                             index_exists) 
             with logging_mutex:     
@@ -406,11 +406,13 @@ class Pipeline :
             """
             BamM filter. Select reads which are mapped with high stringency
             """
-            if self.args.apply_filter :  
+            if self.args.no_mapping_filter :  
+                pass 
+            else :
                 cmd= "bamm filter --bamfile %s --percentage_id %f --percentage_aln %f -o %s " %(input_file,
                                                                                           self.args.percentage_id,
                                                                                           self.args.percentage_aln,
-                                                                                          self.working_dir)
+                                                                                          self.args.working_dir)
                 with logging_mutex:     
                     logger.info("Filter %(input_file)s" % locals())
                     logger.debug("mapping_filter: cmdline\n"+ cmd)  
@@ -422,18 +424,16 @@ class Pipeline :
                     logger.debug("mapping_filter: cmdline\n"+ cmd3)  
                 subprocess.check_call(cmd3, shell=True)
     
-            else: 
-                pass
         
         
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: STEP N_6
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
     # fpkg if bins provided
-        if self.args.apply_filter :  
-            bam_file = mapping_filter
+        if self.args.no_mapping_filter :  
+            bam_file = map2ref 
         else: 
-            bam_file= map2ref
+            bam_file= mapping_filter
         @subdivide(bam_file,formatter(),'{path[0]}/*fpkm.csv','{path[0]}/fpkg.csv' ,self.args.dir_bins,self.logger, self.logging_mutex)
         def bam2fpkm(input_file, output_file,fpkg_file, dir_bins,logger, logging_mutex):
             """
@@ -481,7 +481,7 @@ class Pipeline :
             fpkm_col= [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)]       
             # headers of cols ->  0, n-1, n
             fpkm_col[0].append('bin_ID')
-            fpkm_col[-2].append('gene location')
+            fpkm_col[-2].append('gene location [contig:start:end]')
             fpkm_col[-1].append('annotation')      
         
 #            bins_name =[os.path.splitext(os.path.basename((self.list_gff[i])))[0] for i in range(len(self.list_gff))]
@@ -590,7 +590,7 @@ class Pipeline :
             pass        
         @follows(bam2fpkm)
         @mkdir(subdir_3)
-        @transform(self.working_dir+'/*.log', formatter(".log"),  
+        @transform(self.args.working_dir+'/*.log', formatter(".log"),  
                    os.path.join(subdir_3,"{basename[0]}"+".log"),
                    self.logger, self.logging_mutex)
         def save_log(input_files, output_files, logger, logging_mutex):
@@ -630,7 +630,7 @@ class Pipeline :
             phix_ID_file = [f for f in input_files if re.search(r'phiX_ID.log', f)][0]
             stat.reads[2]= stat.reads[1]- int(subprocess.check_output("wc -l "+phix_ID_file, shell=True).split(' ')[0])    
             # non rRNA/tRNA/tmRNA reads
-            list_fqfiles= self.get_files(self.working_dir,'.fq')
+            list_fqfiles= self.get_files(self.args.working_dir,'.fq')
             pairs_filtered= [f for f in list_fqfiles if re.search(r'concat_paired_R1.fq', f)][0]
             pairs= int(subprocess.check_output("wc -l "+pairs_filtered, shell=True).split(' ')[0])/4
             singles_filtered= [f for f in list_fqfiles if re.search(r'concat_single.fq', f)][0]
@@ -649,7 +649,17 @@ class Pipeline :
             stat.reads[4]=int(mapped_reads)                        
 
             # reads mapped with a given stringency
-            if self.args.apply_filter :
+            if self.args.no_mapping_filter :
+                # save stat_table
+                header= ["step name","tool used","input data","reads count","% total","% previous step"]        
+                tab = numpy.array([[header[0],"raw data", "trimming","remove PhiX","remove ncRNA","alignment "],
+                      [header[1],"FastQC-check", "Trimmomatic","bamM make","SortMeRNA","bamM make"],
+                      [header[2],"raw reads", "raw reads","processed reads","filtered reads","filtered reads"],
+                      [header[3]]+map(str,stat.reads[:-1]) ,
+                      [header[4]]+map(str,stat.get_tot_percentage()[:-1]) ,
+                      [header[5]]+map(str,stat.get_percentage_prev()[:-1])])
+                numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s")                                  
+            else:
                 stringency_filter_log= [f for f in input_files if re.search(r'stringency_filter.log', f)][0]  
                 with open(stringency_filter_log, 'r') as f:
                     for line in f:
@@ -669,16 +679,7 @@ class Pipeline :
                       [header[4]]+map(str,stat.get_tot_percentage()) ,
                       [header[5]]+map(str,stat.get_percentage_prev())])
                 numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s") 
-            else:
-                # save stat_table
-                header= ["step name","tool used","input data","reads count","% total","% previous step"]        
-                tab = numpy.array([[header[0],"raw data", "trimming","remove PhiX","remove ncRNA","alignment "],
-                      [header[1],"FastQC-check", "Trimmomatic","bamM make","SortMeRNA","bamM make"],
-                      [header[2],"raw reads", "raw reads","processed reads","filtered reads","filtered reads"],
-                      [header[3]]+map(str,stat.reads[:-1]) ,
-                      [header[4]]+map(str,stat.get_tot_percentage()[:-1]) ,
-                      [header[5]]+map(str,stat.get_percentage_prev()[:-1])])
-                numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s")         
+       
 
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
