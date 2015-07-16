@@ -441,9 +441,9 @@ class Pipeline :
             """
             Dirseq (compute fpkg values) +  fpkg2fpkm
             """
-    #                                                                        #
-    ## add control! contigs in gff files must be present metaG_contigs file ##
-    #                                                                        #
+    #                                                                       #
+    ## add control! contigs in gff files must be present in metaG_contigs  ##
+    #                                                                       #
             for i in range(len(self.list_gff)):
                 gff_no_fasta= tempfile.NamedTemporaryFile(prefix='transcriptm', suffix='.gff')
                 cmd0 = "sed '/^##FASTA$/,$d' %s > %s" %(self.list_gff[i], gff_no_fasta.name)
