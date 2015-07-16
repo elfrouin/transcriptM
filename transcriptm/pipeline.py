@@ -500,7 +500,7 @@ class Pipeline :
                         reader = csv.reader(csvfile, delimiter='\t') 
                         next(reader) # skip header 
                         for row in reader:
-                            fpkm_col[-2].append(row[0])
+                            fpkm_col[-2].append(row[0]+':'+row[2]+':'+row[3])
                         csvfile.close() 
                 # n col: annotation
                 with open(files_b[0],'r') as csvfile:                    
