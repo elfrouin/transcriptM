@@ -74,7 +74,6 @@ Mapping options (BamM filter):
                         Minimum allowable percentage base identity of a mapped read (default=0.97)
   --percentage_aln PERCENTAGE_ALN
                         Minimum allowable percentage read bases mapped (default=0.95)
-  --no_mapping_filter   Do not adjust the mapping srtingengy by filtering alignments
-                        -> based on identity and aligned of each read (default=False)
+  --no_mapping_filter   Do not adjust the mapping srtingengy by filtering alignments (default=False)
 
 ```
