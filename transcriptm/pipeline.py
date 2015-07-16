@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+
 # lib
 import os
 from ruffus import *
@@ -151,11 +152,7 @@ class Pipeline :
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # Create symbolic link of inputs files in the working directory
         @mkdir(self.working_dir)
-        @originate(self.alias_pe.keys(), 
-#                    formatter(r"(.+)/(?P<NAME>.*).f.*q.gz"),
-                        # move to working directory
-#                        os.path.join(self.working_dir,self.alias_pe["{NAME[0]}"]+".fq.gz"),
-                        self.logger, self.logging_mutex)
+        @originate(self.alias_pe.keys(), self.logger, self.logging_mutex)
         def symlink_to_wd_metaT (soft_link_name, logger, logging_mutex):
             """
             Make soft link in working directory
@@ -302,7 +299,7 @@ class Pipeline :
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: STEP N_4
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #    
-    # Fourth step in the QC process: remove rRNA
+    # Third step in the QC process: remove rRNA
         @subdivide(phiX_extract,formatter(), "{path[0]}/{basename[0]}_non_rRNA.fq",
                    "{path[0]}/{basename[0]}_rRNA.fq",self.logger, self.logging_mutex)
         def sortmerna (input_files, output_files, rRNA_files,logger, logging_mutex):    
@@ -359,13 +356,16 @@ class Pipeline :
             subprocess.check_call(cmd_single, shell=True)
         
         
-        #### WARNINGS : INDEX  (bwa) !!!
+        # Map separately paired-end and singletons with 'BamM' and merge the results in one .bam file
+        # WARNINGS
+        #1. .bam files generated with 'BamM' only contain the mapped reads -> be carful with the interpretation of samtools flagstat
+        #2. only one alignment per read is kept: the secondary and supplementary are removed
         @transform(concat_mapping,formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"),
                    add_inputs(symlink_to_wd_metaG),"{path[0]}/{BASE[0]}.bam",
                    ["{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[0]}.bam",
                     "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
-                    "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".merged.bam"]
-                    ,"{path[0]}/{BASE[0]}_mapping.log",self.logger, self.logging_mutex)
+                    "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".merged.bam"],
+                    "{path[0]}/{BASE[0]}_mapping.log",self.logger, self.logging_mutex)
         def map2ref (input_files, output_file, bams,flagstat,logger,logging_mutex):
             """
             BamM make. Map all metatranscriptomics reads against metagenomics contigs
@@ -441,11 +441,9 @@ class Pipeline :
             """
             Dirseq (compute fpkg values) +  fpkg2fpkm
             """
-    #        list_bins= list(numpy.sort(get_files(dir_bins ,'.fna'))) 
-#            list_gff = list(numpy.sort(get_files(dir_bins ,'.gff')))
-    #        if [os.path.splitext(os.path.basename(x))[0] for x in list_bins] != [os.path.splitext(os.path.basename(x))[0] for x in list_gff]:
-    #            raise Exception("a sequence or gff file is missing" )  
-    #            exit(1)
+    #                                                                        #
+    ## add control! contigs in gff files must be present metaG_contigs file ##
+    #                                                                        #
             for i in range(len(self.list_gff)):
                 gff_no_fasta= tempfile.NamedTemporaryFile(prefix='transcriptm', suffix='.gff')
                 cmd0 = "sed '/^##FASTA$/,$d' %s > %s" %(self.list_gff[i], gff_no_fasta.name)
@@ -480,10 +478,7 @@ class Pipeline :
             """
             Create one table that contains RPKM values for each gene of each bin for the different samples
             """
-            input_files=list(set(input_files))
-#            samples_name=[]            
-#            for i in range(int(len(self.args.paired_end)/2)):
-#                samples_name.append(self.working_dir+os.path.basename(os.path.commonprefix(self.args.paired_end[2*i:2*i+2])))            
+            input_files=list(set(input_files))          
             self.list_gff = list(numpy.sort(self.get_files(self.args.dir_bins ,'.gff')))
             fpkm_col= [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)]       
             # headers of cols ->  0, n-1, n
@@ -645,10 +640,6 @@ class Pipeline :
             stat.reads[3]= pairs + singles    
             # mapped reads
             mapping_log= [f for f in input_files if re.search(r'mapping.log', f)][0]  
-#            with open(mapping_log, 'r') as f:
-#                mapped_reads = f.readline().split(' ')[0]
-#                f.close()
-#            stat.reads[4]=int(mapped_reads)    
             with open(mapping_log, 'r') as f:
                 for line in f:
                     if re.search('with itself and mate mapped',line):   
@@ -662,9 +653,6 @@ class Pipeline :
             # reads mapped with a given stringency
             if self.args.apply_filter :
                 stringency_filter_log= [f for f in input_files if re.search(r'stringency_filter.log', f)][0]  
-#                with open(stringency_filter_log, 'r') as f:
-#                    stringent_mapped_reads = f.readline()[0]
-#                    f.close()
                 with open(stringency_filter_log, 'r') as f:
                     for line in f:
                         if re.search('with itself and mate mapped',line):   
