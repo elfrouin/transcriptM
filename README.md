@@ -7,22 +7,22 @@
   - rRNA, tRNA and tmRNA removal
 * **Complete metagenomics analysis**
   - Map processed metatranscriptomic reads against metagenomic contigs
-  - [Remove reads which mapped with low stringency]
-  - Compute coverage of annotated genes from several population genomes (= bins, sets of metagenomic contigs that might represent individual genome)
+  - Remove reads which mapped with low stringency
+  - Compute coverage of annotated genes from several population genomes (i.e. bins, sets of metagenomic contigs that might represent individual genome)
 
 ```sh
 transcriptm --paired_end sample1-R1.fq.gz sample1-R2.fq.gz sample2-R1.fq.gz sample2-R2.fq.gz --metaG_contigs assembly.fa --dir_bins dir_gff
 ```
 ## Dependencies
-fastqc      (v0.10.1)
-trimmomatic (v0.32)
-bamm        (v1.5.0)
-fxtract     (v1.2)
-sortmerna   (v2.0)
-samtools    (v0.1.19)
-numpy       (v1.9.1)
-dirseq      (v0.0.2)
-tempdir     (v0.6)
+* fastqc      (v0.10.1)
+* trimmomatic (v0.32)
+* bamm        (v1.5.0)
+* fxtract     (v1.2)
+* sortmerna   (v2.0)
+* samtools    (v0.1.19)
+* numpy       (v1.9.1)
+* dirseq      (v0.0.2)
+* tempdir     (v0.6)
 
 ## Database
 In order to remove contaminant sequences, TranscriptM requires 3 databases containing: 
@@ -37,7 +37,7 @@ $ transcriptm -h
 optional arguments:
   -h, --help            show this help message and exit
   --paired_end PAIRED_END [PAIRED_END ...]
-                        Input files: paired sequence files of raw metatranscriptomics reads (.fq.gz format) 
+                        Input files: paired sequence files of raw metatranscriptomic reads (fq.gz format) 
                         e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz
   --metaG_contigs METAG_CONTIGS
                         Fasta file which contain all contigd from the reference metagenome
@@ -66,7 +66,7 @@ optional arguments:
   
   SortMeRNA options:
   --path_db_smr PATH_DB_SMR
-                        Path to databases and index (created with the script sortmerna/2.0/bin/indexdb_rna) 
+                        Path to databases and index (created with sortmerna/2.0/bin/indexdb_rna) 
                         e.g. path_db1,path_index1:path_db2,path_index2 (default: rRNA and tRNA db)
 
 Mapping options (BamM filter):
