@@ -455,11 +455,15 @@ class Pipeline :
                 subprocess.check_call(cmd, shell=True)        
 
                 lib_size= int(subprocess.check_output("samtools view -c "+input_file, shell=True))
-    
-                cmd1= "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e9}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " %(fpkg_file,
-                                                                                                                   lib_size,
-                                                                                                                   input_file.split('.bam')[0]+'_'+os.path.splitext(os.path.basename((self.list_gff[i])))[0] +'_fpkm.csv',
-                                                                                                                   fpkg_file )
+                
+                if lib_size !=0:
+                    cmd1= "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e9}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " %(fpkg_file,
+                                                                                                                       lib_size,
+                                                                                                                       input_file.split('.bam')[0]+'_'+os.path.splitext(os.path.basename((self.list_gff[i])))[0] +'_fpkm.csv',
+                                                                                                                       fpkg_file )
+                else:
+                    cmd1= "cp %s %s; rm %s "%(fpkg_file,input_file.split('.bam')[0]+'_'+os.path.splitext(os.path.basename((self.list_gff[i])))[0] +'_fpkm.csv',fpkg_file)
+                    
                 with logging_mutex:     
                     logger.info("Convert fpkg to fpkm")
                     logger.debug("bam2fpkm: cmdline\n"+ cmd1)
