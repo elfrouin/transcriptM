@@ -24,7 +24,7 @@ transcriptm --paired_end sample1-R1.fq.gz sample1-R2.fq.gz sample2-R1.fq.gz samp
 * dirseq      (v0.0.2)
 * tempdir     (v0.6)
 
-## Database
+## Databases
 In order to remove contaminant sequences, TranscriptM requires 3 databases containing: 
 
 1. The sequences of adapters using during the sequencing 
