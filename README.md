@@ -26,9 +26,10 @@ transcriptm --paired_end sample1-R1.fq.gz sample1-R2.fq.gz sample2-R1.fq.gz samp
 
 ## Database
 In order to remove contaminant sequences, TranscriptM requires 3 databases containing: 
-1.  The sequences of adapters using during the sequencing 
-2.  The sequence of the PhiX genome (used as control in Illumina sequencing)
-3.  The sequences of ribosomal, transfer and transfer-messenger RNA  
+
+1. The sequences of adapters using during the sequencing 
+2. The sequence of the PhiX genome (used as control in Illumina sequencing)
+3. The sequences of ribosomal, transfer and transfer-messenger RNA  
 
 ## Usage
 ```sh
