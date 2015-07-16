@@ -210,7 +210,7 @@ class Pipeline :
                 logger.info("Trim and remove adapters of paired reads of %(input_files)s" % locals())
                 logger.debug("trimmomatic: cmdline\n"+ cmd)
             subprocess.check_call(cmd, shell=True)
-            print ('\t').join([self.prefix_pe[input_files[0].split('_R1.fq.gz')[0]],'FastQC-check','raw reads','val','100.0','100.0'])
+            print ('\t').join([self.prefix_pe[os.path.basename(input_files[0]).split('_R1.fq.gz')[0]],'FastQC-check','raw reads','val','100.0','100.0'])
 
           
        
