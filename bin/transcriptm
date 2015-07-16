@@ -89,12 +89,7 @@ if __name__ == '__main__':
         path_index = os.path.join(args.db_path,"1-SortMeRNA/index")
         raise Exception ('No index found for SortMeRNA database.\n Use the cmdline below: \n sortmerna/2.0/bin/indexdb_rna --ref path_db1,path_index1:path_db2,path_index2 ')
         exit(1)
-    
-    # check if mapping args are correct
-    if (args.percentage_id or args.percentage_aln) and args.no_mapping_filter:
-        raise Exception ("Error in mapping options: flags --percentage_id and --percentage_aln cannot be used with --no_mapping_filter ")
-        exit(1)
-        
+            
     # log
     logger, logging_mutex = cmdline.setup_logging (__name__, args.log_file, args.verbose)
     
