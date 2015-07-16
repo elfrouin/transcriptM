@@ -8,7 +8,7 @@ class Monitoring:
         self.reads = [0] * 6
         #{"raw","trimmed","phix","ncRNA","mapped","mapped_strict"}
    
-   def get_tot_percentage(self):
+    def get_tot_percentage(self):
         tot_percentage = [float(x)/self.reads[0]*100 for x in self.reads]
         return tot_percentage
     
