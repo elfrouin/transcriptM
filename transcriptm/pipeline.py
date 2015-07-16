@@ -210,7 +210,7 @@ class Pipeline :
                 logger.info("Trim and remove adapters of paired reads of %(input_files)s" % locals())
                 logger.debug("trimmomatic: cmdline\n"+ cmd)
             subprocess.check_call(cmd, shell=True)
-            print ('\t').join([self.prefix_pe[os.path.basename(input_files[0]).split('_R1.fq.gz')[0]],'FastQC-check','raw reads','val','100.0','100.0'])
+#            print ('\t').join([self.prefix_pe[os.path.basename(input_files[0]).split('_R1.fq.gz')[0]],'FastQC-check','raw reads','val','100.0','100.0'])
 
           
        
@@ -606,7 +606,7 @@ class Pipeline :
      
         subdir_4= os.path.join(self.args.output_dir,"reads_distribution") 
         @mkdir(subdir_4)              
-        @collate(save_log,formatter(r"/log/(?P<BASE>.*)((mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_rRNA)))).log$"),subdir_4+"/{BASE[0]}reads_stat")
+        @collate(save_log,formatter(r"/log/(?P<BASE>.*)((stringency_filter)|(mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_rRNA)))).log$"),subdir_4+"/{BASE[0]}reads_stat")
         def logtable (input_files,output_file):
             """
             Sums up the count of reads which are kept after each step 
