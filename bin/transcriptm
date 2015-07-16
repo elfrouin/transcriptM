@@ -28,9 +28,9 @@ if __name__ == '__main__':
 
     # Options   
     parser.add_argument("--paired_end",nargs="+", dest="paired_end", help="Input files: paired sequence files of raw metatranscriptomics reads (.fq.gz format)  e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz",required=True)
-    parser.add_argument("--metaG_contigs", dest="metaG_contigs", help="fasta file which contain all contigd from the reference metagenome",required=True)
+    parser.add_argument("--metaG_contigs", dest="metaG_contigs", help="Fasta file which contain all contigd from the reference metagenome",required=True)
     parser.add_argument("--dir_bins", dest="dir_bins", help="Directory which contains several annotated bins (gff format, the others files would be ignored)",required=True)
-    parser.add_argument("--threads", dest="threads", help="number of threads to use (default=20)", default=20)
+    parser.add_argument("--threads", dest="threads", help="Number of threads to use (default=20)", default=20)
     
     # check if the db is an environment variable
     db_path=None    
@@ -43,17 +43,18 @@ if __name__ == '__main__':
     else :
         parser.add_argument("--db_path", dest="db_path", help="Directory which contains the TranscriptM databases",required=True)
     parser.add_argument("--output_dir", dest="output_dir", help="Output directory (default: ./TranscriptM_output )", default='TranscriptM_output')
-    parser.add_argument("--working_dir", dest="working_dir", help="Working directory (default: /tmp )", default= tempdir.TempDir().name)
+    tmpdir= tempdir.TempDir()
+    parser.add_argument("--working_dir", dest="working_dir", help="Working directory (default: /tmp )", default= tmpdir.name)
        
     # Trimmomatic
     trimm_args=parser.add_argument_group('Trimmomatic options')
-    trimm_args.add_argument('--adapters', help="type of adapters to clip (default='truseq') ", choices=['nextera', 'truseq'],default= 'truseq')
-    trimm_args.add_argument('--min_len', help="minimum required length of read (default = 30)", type=int, default = 30)
-    trimm_args.add_argument('--min_avg_qc', help="minimum average quality score for 4 bp windows (default = 25)", type=int, default = 25)
-    trimm_args.add_argument('--phred', help="quality encoding (default='phred33') ", choices=['phred33', 'phred64'],default='phred33')
-    trimm_args.add_argument('--min_qc', help="minimum quality score for leading and trailing bases (default = 20)", type=int, default = 20)
-    trimm_args.add_argument('--crop', help="cut read to a specific length (default = 10000)", type=int, default = 10000)
-    trimm_args.add_argument('--headcrop', help="cut specified number of bases from start of read (default=0)", type=int, default = 0)
+    trimm_args.add_argument('--adapters', help="Type of adapters to clip (default='truseq') ", choices=['nextera', 'truseq'],default= 'truseq')
+    trimm_args.add_argument('--min_len', help="Minimum required length of read (default = 30)", type=int, default = 30)
+    trimm_args.add_argument('--min_avg_qc', help="Minimum average quality score for 4 bp windows (default = 25)", type=int, default = 25)
+    trimm_args.add_argument('--phred', help="Quality encoding (default='phred33') ", choices=['phred33', 'phred64'],default='phred33')
+    trimm_args.add_argument('--min_qc', help="Minimum quality score for leading and trailing bases (default = 20)", type=int, default = 20)
+    trimm_args.add_argument('--crop', help="Cut read to a specific length (default = 10000)", type=int, default = 10000)
+    trimm_args.add_argument('--headcrop', help="Cut specified number of bases from start of read (default=0)", type=int, default = 0)
      
     # SortMeRNA
     sortmerna_args=parser.add_argument_group('SortMeRNA options')    
@@ -69,16 +70,16 @@ if __name__ == '__main__':
         '%s/rfam-cyano_tmRNA.fa,%s/rfam-cyano_tmRNA-db:%s/rfam-mt_tmRNA.fa,%s/rfam-mt_tmRNA-db:'\
         '%s/rfam-tmRNA.fa,%s/rfam-tmRNA-db:%s/rfam-tRNA.fa,%s/rfam-tRNA-db:'\
         '%s/rfam-tRNA_Sec.fa,%s/rfam-tRNA_Sec-db'%((path_rRNA,path_index)*8+(path_tRNA,path_index)*7)
-        sortmerna_args.add_argument('--path_db_smr',help=" path to databases and index (created with the script sortmerna/2.0/bin/indexdb_rna)  EX: path_db1,path_index1:path_db2,path_index2 (default: rRNA and tRNA db)",default = db_smr)
+        sortmerna_args.add_argument('--path_db_smr',help=" Path to databases and index (created with the script sortmerna/2.0/bin/indexdb_rna)  e.g. path_db1,path_index1:path_db2,path_index2 (default: rRNA and tRNA db)",default = db_smr)
     except KeyError:
-        sortmerna_args.add_argument('--path_db_smr',help=" path to databases and index (created with the script sortmerna/2.0/bin/indexdb_rna)  EX: path_db1,path_index1:path_db2,path_index2",required=True)
+        sortmerna_args.add_argument('--path_db_smr',help=" Path to databases and index (created with the script sortmerna/2.0/bin/indexdb_rna)  e.g. path_db1,path_index1:path_db2,path_index2",required=True)
 
 
     # Mapping: BamM filter
     mapping_args=parser.add_argument_group('Mapping options (BamM filter)')
-    mapping_args.add_argument('--percentage_id', type=float, dest='percentage_id', help=' minimum allowable percentage base identity of a mapped read (default=0.97)', default=0.97)
-    mapping_args.add_argument('--percentage_aln', type=float, dest='percentage_aln', help='minimum allowable percentage read bases mapped (default=0.95)', default=0.95)
-    mapping_args.add_argument('--no_mapping_filter',  action="store_true", dest='no_mapping_filter', help='Adjust the mapping srtingengy by filtering alignments \n-> based on identity and aligned of each read (default=False)', default=False)
+    mapping_args.add_argument('--percentage_id', type=float, dest='percentage_id', help=' Minimum allowable percentage base identity of a mapped read (default=0.97)', default=0.97)
+    mapping_args.add_argument('--percentage_aln', type=float, dest='percentage_aln', help='Minimum allowable percentage read bases mapped (default=0.95)', default=0.95)
+    mapping_args.add_argument('--no_mapping_filter',  action="store_true", dest='no_mapping_filter', help='Do not adjust the mapping srtingengy by filtering alignments (default=False)', default=False)
     
     args = parser.parse_args()
     
@@ -98,5 +99,5 @@ if __name__ == '__main__':
     run.pipeline_stages()
     run.clear()
     
-    
+    tmpdir.dissolve()
     
