@@ -5,8 +5,6 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 #from ruffus import *
 import ruffus.cmdline as cmdline
-import tempfile
-import sys
 import os
 import tempdir
 
@@ -37,8 +35,8 @@ if __name__ == '__main__':
         parser.add_argument("--db_path", dest="db_path", help="Directory which contains the TranscriptM databases (default: /svr/db/transcriptm)", default= os.environ['TRANSCRIPTM_DATABASE'])
     except KeyError:
         parser.add_argument("--db_path", dest="db_path", help="Directory which contains the TranscriptM databases",required=True)
-    parser.add_argument("--output_dir", dest="output_dir", help="Output directory", default='TranscriptM_output')
-    parser.add_argument("--keep_working_dir",action="store_true", dest="keep_working_dir", help="Keep all temporary files (in TranscriptM_temp/)", default= False)
+    parser.add_argument("--output_dir", dest="output_dir", help="Output directory (default: ./TranscriptM_output )", default='TranscriptM_output')
+    parser.add_argument("--keep_working_dir",action="store_true", dest="keep_working_dir", help="Keep all temporary files (in ./TranscriptM_temp)", default= False)
        
     # Trimmomatic
     trimm_args=parser.add_argument_group('Trimmomatic options')

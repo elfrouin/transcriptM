@@ -55,7 +55,6 @@ class Pipeline :
         for i in range(int(len(self.args.paired_end)/2)) :
             self.alias_pe[os.path.join(self.working_dir,'sample-'+str(i)+'_R1.fq.gz')] =self.args.paired_end[2*i]
             self.alias_pe[os.path.join(self.working_dir,'sample-'+str(i)+'_R2.fq.gz')] =self.args.paired_end[2*i+1]
-        print self.alias_pe
         
         self.prefix_pe= {}
         for  i in range(int(len(self.args.paired_end)/2)) :
@@ -66,7 +65,6 @@ class Pipeline :
             elif value.endswith(('_R','-R','.R'),0):  
                 value=value[:-2]                               
             self.prefix_pe[('sample-'+str(i))]=value
-        print self.prefix_pe   
         
         if len(set(self.prefix_pe.values()))< int(len(self.args.paired_end)/2):
             print [item for item, count in collections.Counter(self.prefix_pe.values()).items() if count > 1]
