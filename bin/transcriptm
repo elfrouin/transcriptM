@@ -1,0 +1,110 @@
+#!/usr/bin/env python
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+# LIBRARIES
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+#from ruffus import *
+import ruffus.cmdline as cmdline
+import tempfile
+import sys
+import os
+import tempdir
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+# LOCAL IMPORT
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+from transcriptm_new.pipeline import Pipeline 
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+# MAIN
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
+## Args
+if __name__ == '__main__':
+    parser = cmdline.get_argparse(description='''
+    WHAT DOES THIS PIPELINE DO? \n
+    process metatranscriptomic data and complete metagenomics analysis\n
+    ex: transcriptm --paired_end sample1-R1.fq.gz sample1-R2.fq.gz sample2-R1.fq.gz sample2-R2.fq.gz --metaG_contigs assembly.fa --dir_bins dir_gff
+    ''')
+
+    # Options   
+    parser.add_argument("--paired_end",nargs="+", dest="paired_end", help="Input files: paired sequence files of raw metatranscriptomics reads (.fq.gz format)  EX: --paired_end reads1_1.fq.gz reads1_2.fq.gz reads2_1.fq.gz reads2_2.fq.gz",required=True)
+    parser.add_argument("--metaG_contigs", dest="metaG_contigs", help="fasta file which contain all contigd from the reference metagenome",required=True)
+    parser.add_argument("--dir_bins", dest="dir_bins", help="Directory which contains several annotated bins (gff format, the others files would be ignored)",required=True)
+    parser.add_argument("--threads", dest="threads", help="number of threads to use (default=20)", default=20)
+    try :
+        parser.add_argument("--db_path", dest="db_path", help="Directory which contains the TranscriptM databases (default: /svr/db/transcriptm)", default= os.environ['TRANSCRIPTM_DATABASE'])
+    except KeyError:
+        parser.add_argument("--db_path", dest="db_path", help="Directory which contains the TranscriptM databases",required=True)
+    parser.add_argument("--output_dir", dest="output_dir", help="Output directory", default='TranscriptM_output')
+    parser.add_argument("--keep_working_dir",action="store_true", dest="keep_working_dir", help="Keep all temporary files (in TranscriptM_temp/)", default= False)
+       
+    # Trimmomatic
+    trimm_args=parser.add_argument_group('Trimmomatic options')
+    trimm_args.add_argument('--adapters', help="type of adapters to clip (default='truseq') ", choices=['nextera', 'truseq'],default= 'truseq')
+    trimm_args.add_argument('--min_len', help="minimum required length of read (default = 30)", type=int, default = 30)
+    trimm_args.add_argument('--min_avg_qc', help="minimum average quality score for 4 bp windows (default = 25)", type=int, default = 25)
+    trimm_args.add_argument('--phred', help="quality encoding (default='phred33') ", choices=['phred33', 'phred64'],default='phred33')
+    trimm_args.add_argument('--min_qc', help="minimum quality score for leading and trailing bases (default = 20)", type=int, default = 20)
+    trimm_args.add_argument('--crop', help="cut read to a specific length (default = 10000)", type=int, default = 10000)
+    trimm_args.add_argument('--headcrop', help="cut specified number of bases from start of read (default=0)", type=int, default = 0)
+     
+    # SortMeRNA
+    sortmerna_args=parser.add_argument_group('SortMeRNA options')    
+    try :
+        path_rRNA = os.path.join(os.environ["TRANSCRIPTM_DATABASE"],"1-SortMeRNA/rRNA_databases")
+        path_tRNA= os.path.join(os.environ["TRANSCRIPTM_DATABASE"],"1-SortMeRNA/tRNA_databases")
+        path_index = os.path.join(os.environ["TRANSCRIPTM_DATABASE"],"1-SortMeRNA/index")
+        db_smr = '%s/silva-bac-16s-id90.fasta,%s/silva-bac-16s-db:%s/silva-bac-23s-id98.fasta,%s/silva-bac-23s-db:'\
+        '%s/silva-arc-16s-id95.fasta,%s/silva-arc-16s-db:%s/silva-arc-23s-id98.fasta,%s/silva-arc-23s-db:'\
+        '%s/silva-euk-18s-id95.fasta,%s/silva-euk-18s-db:%s/silva-euk-28s-id98.fasta,%s/silva-euk-28s:'\
+        '%s/rfam-5s-database-id98.fasta,%s/rfam-5s-db:%s/rfam-5.8s-database-id98.fasta,%s/rfam-5.8s-db:'\
+        '%s/rfam-alpha_tmRNA.fa,%s/rfam-alpha_tmRNA-db:%s/rfam-beta_tmRNA.fa,%s/rfam-beta_tmRNA-db:'\
+        '%s/rfam-cyano_tmRNA.fa,%s/rfam-cyano_tmRNA-db:%s/rfam-mt_tmRNA.fa,%s/rfam-mt_tmRNA-db:'\
+        '%s/rfam-tmRNA.fa,%s/rfam-tmRNA-db:%s/rfam-tRNA.fa,%s/rfam-tRNA-db:'\
+        '%s/rfam-tRNA_Sec.fa,%s/rfam-tRNA_Sec-db'%((path_rRNA,path_index)*8+(path_tRNA,path_index)*7)
+        sortmerna_args.add_argument('--path_db_smr',help=" path to databases and index (created with the script sortmerna/2.0/bin/indexdb_rna)  EX: path_db1,path_index1:path_db2,path_index2 (default: rRNA and tRNA db)" ,default = db_smr)
+    except KeyError:
+        sortmerna_args.add_argument('--path_db_smr',help=" path to databases and index (created with the script sortmerna/2.0/bin/indexdb_rna)  EX: path_db1,path_index1:path_db2,path_index2" ,required=True)
+
+
+    # Mapping: BamM filter
+    mapping_args=parser.add_argument_group('Mapping options (BamM filter)')
+    mapping_args.add_argument('--apply_filter',  action="store_true", dest='apply_filter', help='Adjust the mapping srtingengy by filtering alignments \n-> based on identity and aligned of each read (default=False)', default=False)
+    mapping_args.add_argument('--percentage_id', type=float, dest='percentage_id', help=' minimum allowable percentage base identity of a mapped read (default=0.97)', default=0.97)
+    mapping_args.add_argument('--percentage_aln', type=float, dest='percentage_aln', help='minimum allowable percentage read bases mapped (default=0.95)', default=0.95)
+    
+    args = parser.parse_args()
+    
+    # create tempdir
+    if args.keep_working_dir:
+        tmpdir_name= "TranscriptM_temp/"
+    else :
+        t= tempdir.TempDir()
+        tmpdir_name= t.name
+    # check if the SortMeRNA database is indexed
+    if os.path.isdir(os.path.join(args.db_path,'1-SortMeRNA/')) and not os.path.isdir(os.path.join(args.db_path,'1-SortMeRNA/index')):
+        path_rRNA = os.path.join(args.db_path,"1-SortMeRNA/rRNA_databases")
+        path_tRNA= os.path.join(args.db_path,"1-SortMeRNA/tRNA_databases")
+        path_index = os.path.join(args.db_path,"1-SortMeRNA/index")
+        raise Exception ('No index found for SortMeRNA database.\n Use the cmdline below: \n sortmerna/2.0/bin/indexdb_rna --ref path_db1,path_index1:path_db2,path_index2 ')
+        exit(1)
+            
+    # log
+    logger, logging_mutex = cmdline.setup_logging (__name__, args.log_file, args.verbose)
+    
+    # run the pipeline
+    run=Pipeline(args,tmpdir_name)
+    run.pipeline_stages()
+    run.clear()
+    
+    # dissolve tempdir
+    try:    
+        t.dissolve()
+    except NameError:
+        pass
+
+    
+    
+    
