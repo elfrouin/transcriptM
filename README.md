@@ -1,7 +1,7 @@
 # transcriptM
 
 ## Overview
-* Process metatranscriptomic paired-end reads (sequenced with Illumina)
+* Process several sets of metatranscriptomic paired-end reads (sequenced with Illumina)
   - Quality trimming
   - PhiX reads removal
   - rRNA, tRNA and tmRNA removal
