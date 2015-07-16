@@ -8,7 +8,7 @@
 * **Complete metagenomics analysis**
   - Map processed metatranscriptomic reads against metagenomic contigs
   - Remove reads which mapped with low stringency
-  - Compute coverage of annotated genes from several population genomes (i.e. bins, sets of metagenomic contigs that might represent individual genome)
+  - Compute coverage of annotated genes from several population genomes (i.e. bins, sets of metagenomic contigs that might represent individual genome) in different samples.
 
 ```sh
 transcriptm --paired_end sample1-R1.fq.gz sample1-R2.fq.gz sample2-R1.fq.gz sample2-R2.fq.gz --metaG_contigs assembly.fa --dir_bins dir_gff
@@ -51,7 +51,7 @@ optional arguments:
   --working_dir WORKING_DIR
                         Working directory (default: /tmp)
                         
-  Trimmomatic options:
+Trimmomatic options:
   --adapters {nextera,truseq}
                         Type of adapters to clip (default='truseq')
   --min_len MIN_LEN     Minimum required length of read (default = 30)
@@ -64,7 +64,7 @@ optional arguments:
   --headcrop HEADCROP   Cut specified number of bases from start of read (default=0)
   
   
-  SortMeRNA options:
+SortMeRNA options:
   --path_db_smr PATH_DB_SMR
                         Path to databases and index (created with sortmerna/2.0/bin/indexdb_rna) 
                         e.g. path_db1,path_index1:path_db2,path_index2 
