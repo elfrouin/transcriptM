@@ -46,7 +46,6 @@ optional arguments:
                         (gff format, the others files would be ignored)
   --threads THREADS     Number of threads to use (default=20)
   --db_path DB_PATH     Directory which contains the TranscriptM databases
-                        (default: /srv/db/transcriptm/1)
   --output_dir OUTPUT_DIR
                         Output directory (default: ./TranscriptM_output)
   --working_dir WORKING_DIR
@@ -68,7 +67,7 @@ optional arguments:
   SortMeRNA options:
   --path_db_smr PATH_DB_SMR
                         Path to databases and index (created with sortmerna/2.0/bin/indexdb_rna) 
-                        e.g. path_db1,path_index1:path_db2,path_index2 (default: rRNA and tRNA db)
+                        e.g. path_db1,path_index1:path_db2,path_index2 
 
 Mapping options (BamM filter):
   --percentage_id PERCENTAGE_ID
