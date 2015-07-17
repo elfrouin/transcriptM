@@ -63,12 +63,18 @@ class Pipeline :
                 value=value[:-1]  
             elif value.endswith(('_R','-R','.R'),0):  
                 value=value[:-2]                               
-            self.prefix_pe[('sample-'+str(i))]=value
+            self.prefix_pe['sample-'+str(i)]=value
         
         if len(set(self.prefix_pe.values()))< int(len(self.args.paired_end)/2):
             print [item for item, count in collections.Counter(self.prefix_pe.values()).items() if count > 1]
             raise Exception ("2 sets of paired-ends files have the same prefix. Rename one set. \n")
             exit(1)
+         
+        self.tot_pe= {}
+        for i in range(int(len(self.args.paired_end)/2)) :
+            count = int(subprocess.check_output("zcat %s | wc -l " %(self.args.paired_end[2*i]), shell=True).split(' ')[0])/4 
+            self.tot_pe[self.prefix_pe['sample-'+str(i)]]=count
+            print  ('\t').join([self.prefix_pe['sample-'+str(i)],'raw data','FastQC-check','raw reads',str(count),'100.00 %'])
         # log
         self.logger, self.logging_mutex = cmdline.setup_logging (__name__, args.log_file, args.verbose)
         
@@ -186,7 +192,7 @@ class Pipeline :
         def trimmomatic(input_files, output_file,log,logger, logging_mutex):
             """
             Trimmomatic. Trim and remove adapters of paired reads
-            """    
+            """   
             if len(input_files) != 2:
                 raise Exception("One of read pairs %s missing" % (input_files,))
             cmd= "trimmomatic PE -threads %d -%s %s %s %s %s %s %s ILLUMINACLIP:%s:2:30:10 \
@@ -210,21 +216,13 @@ class Pipeline :
                 logger.info("Trim and remove adapters of paired reads of %(input_files)s" % locals())
                 logger.debug("trimmomatic: cmdline\n"+ cmd)
             subprocess.check_call(cmd, shell=True)
-            # monitoring of count reads            
-            name_sample = self.prefix_pe[os.path.basename(input_files[0]).split('_R1.fq.gz')[0]]
-            # dict stat: 
-                #keys  -> couple of paired-end files
-                #value -> monitoring object
-            stat = {} 
-            stat[name_sample]=Monitoring()
-            ## raw reads
-            raw_reads = stat[name_sample].count_raw_reads(log)
-            print ('\t').join([name_sample,'FastQC-check','raw reads',str(raw_reads),'100.00','100.00'])
+           
+            #  ~~~~ monitoring: count of reads  ~~~~ #  
+            name_sample = self.prefix_pe[os.path.basename(input_files[0]).split('_R1.fq.gz')[0]]            
+            stat= Monitoring(self.tot_pe[name_sample])
             ## processed reads
-            processed_reads = stat[name_sample].count_processed_reads(log)
-            print ('\t').join([name_sample,'Trimmomatic','raw reads',str(processed_reads),
-                               stat[name_sample].get_tot_percentage(1),
-                               stat[name_sample].get_percentage_prev(1)])
+            processed_reads = stat.count_processed_reads(log)
+            print ('\t').join([name_sample,'trimming','Trimmomatic','raw reads',str(processed_reads),stat.get_tot_percentage(processed_reads)])
 
                   
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -263,8 +261,8 @@ class Pipeline :
             subprocess.check_call(cmd, shell=True)
 
         
-        @collate(phiX_ID,formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),'{path[0]}/{BASE[0]}phiX_ID.log',self.logger, self.logging_mutex)
-        def phiX_concat_ID(input_files, output_file,logger, logging_mutex):
+        @collate(phiX_ID,formatter(r"phiX.(?P<BASE>.*)[UP][12].txt$"),'{path[0]}/{BASE[0]}phiX_ID.log','{BASE[0]}',self.logger, self.logging_mutex)
+        def phiX_concat_ID(input_files, output_file,basename,logger, logging_mutex):
             """
             Concatenate all PhiX ID found previously
             """
@@ -276,6 +274,17 @@ class Pipeline :
                 logger.info("Concatenate in ONE file all ID of phiX reads")
                 logger.debug("phiX_concat_ID: cmdline\n"+ cmd)
             subprocess.check_call(cmd, shell=True) 
+           
+           #  ~~~~ monitoring: count of reads  ~~~~ #                 
+            name_sample = self.prefix_pe[os.path.basename(output_file).split('_trimm_phiX_ID.log')[0]]            
+            stat= Monitoring(self.tot_pe[name_sample])
+            ## non phiX reads
+            trimm_file = os.path.join(self.args.working_dir,[f for f in os.listdir(self.args.working_dir) if re.search(r'%s.*trimmomatic.log'%(basename.split('_')[0]), f)][0])     
+            processed_reads = stat.count_processed_reads(trimm_file)
+            phiX_reads = int(subprocess.check_output("wc -l "+output_file, shell=True).split(' ')[0])
+            non_phiX_reads = processed_reads - phiX_reads
+            print ('\t').join([name_sample,'PhiX removal','bamM make','processed reads',str(non_phiX_reads),stat.get_tot_percentage(non_phiX_reads)])
+ 
 
 
         @subdivide(trimmomatic,regex(r"trimm_[UP][12].fq.gz"),["trimm_P1.fq.gz", "trimm_P2.fq.gz", "trimm_U1.fq.gz", "trimm_U2.fq.gz"])
@@ -365,7 +374,15 @@ class Pipeline :
                 logger.debug("concat_mapping: cmdline\n"+ cmd_single)  
             subprocess.check_call(cmd_single, shell=True)
         
-        
+            #  ~~~~ monitoring: count of reads  ~~~~ #     
+            name_sample = self.prefix_pe[os.path.basename(output_files[0]).split('_concat_paired_R1.fq')[0]]            
+            stat= Monitoring(self.tot_pe[name_sample])
+            ## non ncRNA reads
+            non_ncRNA_reads = stat.count_seq_fq(output_files[0])+stat.count_seq_fq(output_files[2])
+            print ('\t').join([name_sample,'remove ncRNA','SortMeRNA','filtered reads (1st)',
+                               str(non_ncRNA_reads),stat.get_tot_percentage(non_ncRNA_reads)])
+
+
         # Map separately paired-end and singletons with 'BamM' and merge the results in one .bam file
         # WARNINGS
         #1. .bam files generated with 'BamM' only contain the mapped reads -> be carful with the interpretation of samtools flagstat
@@ -410,6 +427,13 @@ class Pipeline :
                 logger.debug("map2ref: cmdline\n"+ cmd3)  
             subprocess.check_call(cmd3, shell=True)
     
+            #  ~~~~ monitoring: count of reads  ~~~~ #   
+            name_sample = self.prefix_pe[os.path.basename(output_file).split('.bam')[0]]            
+            stat= Monitoring(self.tot_pe[name_sample])
+            ## reads filtered : mapped with high stringency
+            mapped_reads = stat.count_mapping_reads(flagstat,True)
+            print ('\t').join([name_sample,'alignment','BamM make','filtered reads (2nd)',
+                               str(mapped_reads),stat.get_tot_percentage(mapped_reads)])
         
         
         @transform(map2ref,formatter('.bam'),"{path[0]}/{basename[0]}_filtered.bam", 
@@ -435,6 +459,15 @@ class Pipeline :
                     logger.info("Compute statistics of %(input_file)s (samtools flastat)" % locals())
                     logger.debug("mapping_filter: cmdline\n"+ cmd3)  
                 subprocess.check_call(cmd3, shell=True)
+
+                #  ~~~~ monitoring: count of reads  ~~~~ #   
+                name_sample = self.prefix_pe[os.path.basename(output_file).split('_filtered.bam')[0]]            
+                stat= Monitoring(self.tot_pe[name_sample])
+                ## reads filtered : mapped with high stringency
+                mapped_reads_f = stat.count_mapping_reads(flagstat,False)
+                print ('\t').join([name_sample,'.bam filter','BamM filter','mapped reads',
+                                   str(mapped_reads_f),stat.get_tot_percentage(mapped_reads_f)])
+
     
         
         
@@ -622,82 +655,69 @@ class Pipeline :
      
         subdir_4= os.path.join(self.args.output_dir,"reads_distribution") 
         @mkdir(subdir_4)              
-        @collate(save_log,formatter(r"/log/(?P<BASE>.*)((stringency_filter)|(mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_rRNA)))).log$"),subdir_4+"/{BASE[0]}reads_stat")
-        def logtable (input_files,output_file):
+        @collate(save_log,formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_rRNA)))).log$"),
+                 subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')
+        def logtable (input_files,output_file,basename):
             """
             Sums up the count of reads which are kept after each step 
             """
-            stat = Monitoring()          
-            # raw/processed reads
+            name_sample = self.prefix_pe[basename]
+            stat = Monitoring(self.tot_pe[name_sample])          
+            # raw
+            stat.reads[0]= stat.count_raw_reads()
+            #processed reads
             trimm_file = [f for f in input_files if re.search(r'trimmomatic.log', f)][0]     
-            count=0
-            f = open(trimm_file,'r')
-            for line in f:
-                if "Input Read Pairs: " in line: 
-                    count = [int(x) for x in line.split(' ') if x.isdigit()]
-                    #0:raw 1:both_surv 2:fwd_surv 3:rev_surv 4:dropped
-                    break
-            f.close()
-            raw_reads = count[0]
-            processed_reads = sum(count[1:4])
-            stat.reads[0]=raw_reads
-            stat.reads[1]= processed_reads           
+            stat.reads[1]= stat.count_processed_reads(trimm_file)         
             # non phiX reads
             phix_ID_file = [f for f in input_files if re.search(r'phiX_ID.log', f)][0]
-            stat.reads[2]= stat.reads[1]- int(subprocess.check_output("wc -l "+phix_ID_file, shell=True).split(' ')[0])    
+            stat.reads[2]= stat.count_non_Phix_reads(phix_ID_file) 
             # non rRNA/tRNA/tmRNA reads
             list_fqfiles= self.get_files(self.args.working_dir,'.fq')
             pairs_filtered= [f for f in list_fqfiles if re.search(r'concat_paired_R1.fq', f)][0]
-            pairs= int(subprocess.check_output("wc -l "+pairs_filtered, shell=True).split(' ')[0])/4
             singles_filtered= [f for f in list_fqfiles if re.search(r'concat_single.fq', f)][0]
-            singles= int(subprocess.check_output("wc -l "+ singles_filtered, shell=True).split(' ')[0])/4            
-            stat.reads[3]= pairs + singles    
+            stat.reads[3]= stat.count_non_ncRNA_reads(pairs_filtered,singles_filtered)    
             # mapped reads
             mapping_log= [f for f in input_files if re.search(r'mapping.log', f)][0]  
-            with open(mapping_log, 'r') as f:
-                for line in f:
-                    if re.search('with itself and mate mapped',line):   
-                        pairs_mapped = int(line.split(' ')[0])
-                    elif re.search('in total', line):
-                        total_mapped = int(line.split(' ')[0])
-                mapped_reads = pairs_mapped/2 +(total_mapped-pairs_mapped)
-                f.close()
-            stat.reads[4]=int(mapped_reads)                        
+            stat.reads[4]= stat.count_mapping_reads(mapping_log,True)      
 
             # reads mapped with a given stringency
             if self.args.no_mapping_filter :
                 # save stat_table
-                header= ["step name","tool used","input data","reads count","% total","% previous step"]        
-                tab = numpy.array([[header[0],"raw data", "trimming","remove PhiX","remove ncRNA","alignment "],
-                      [header[1],"FastQC-check", "Trimmomatic","bamM make","SortMeRNA","bamM make"],
-                      [header[2],"raw reads", "raw reads","processed reads","filtered reads","filtered reads"],
-                      [header[3]]+map(str,stat.reads[:-1]) ,
-                      [header[4]]+map(str,stat.get_all_tot_percentage()[:-1]) ,
-                      [header[5]]+map(str,stat.get_all_percentage_prev()[:-1])])
+                tab = numpy.array([[name_sample]*5,
+                      ["raw data", "trimming","remove PhiX","remove ncRNA","alignment "],
+                      ["FastQC-check", "Trimmomatic","bamM make","SortMeRNA","bamM make"],
+                      ["raw reads", "raw reads","processed reads","filtered reads","filtered reads"],
+                      map(str,stat.reads[:-1]) ,
+                      map(str,stat.get_all_tot_percentage()[:-1]) ,
+                      map(str,stat.get_all_percentage_prev()[:-1])])
                 numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s")                                  
             else:
                 stringency_filter_log= [f for f in input_files if re.search(r'stringency_filter.log', f)][0]  
-                with open(stringency_filter_log, 'r') as f:
-                    for line in f:
-                        if re.search('with itself and mate mapped',line):   
-                            pairs_mapped_s = int(line.split(' ')[0])
-                        elif re.search('in total', line):
-                            total_mapped_s = int(line.split(' ')[0])
-                    stringent_mapped_reads = pairs_mapped_s/2 +(total_mapped_s-pairs_mapped_s)
-                    f.close()
-                stat.reads[5]=int(stringent_mapped_reads)                                    
+                stat.reads[5]=stat.count_mapping_reads(stringency_filter_log,False)                                   
                 # save stat_table
-                header= ["step name","tool used","input data","reads count","% total","% previous step"]        
-                tab = numpy.array([[header[0],"raw data", "trimming","remove PhiX","remove ncRNA","alignment ",".bam filter"],
-                      [header[1],"FastQC-check", "Trimmomatic","bamM make","SortMeRNA","bamM make","bamM filter"],
-                      [header[2],"raw reads", "raw reads","processed reads","filtered reads","filtered reads","mapped reads"],
-                      [header[3]]+map(str,stat.reads) ,
-                      [header[4]]+map(str,stat.get_all_tot_percentage()) ,
-                      [header[5]]+map(str,stat.get_all_percentage_prev())])
+                tab = numpy.array([[name_sample]*6,
+                      ["raw data", "trimming","remove PhiX","remove ncRNA","alignment ",".bam filter"],
+                      ["FastQC-check", "Trimmomatic","bamM make","SortMeRNA","bamM make","bamM filter"],
+                      ["raw reads", "raw reads","processed reads","filtered reads","filtered reads","mapped reads"],
+                      map(str,stat.reads) ,
+                      map(str,stat.get_all_tot_percentage()) ,
+                      map(str,stat.get_all_percentage_prev())])
                 numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s") 
        
 
-
+        @merge(logtable,os.path.join(self.args.output_dir,'summary_reads'),self.logger, self.logging_mutex)
+        def concatenate_logtables (input_files,output_file,logger,logging_mutex):
+            """
+            Concatenate the summuries of reads distribution from all samples
+            """
+            input_files = (' ').join(input_files)
+            h= ["sample name","step name","tool used","input data","reads count","% total","% previous step"]  
+            header= ('\t').join(h)            
+            cmd= "cat %s > %s ;sed -i '1i%s' %s"   %(input_files, output_file,header,output_file)    
+            with logging_mutex:
+                logger.info("Concatenate summaries: %(input_files)s" % locals())
+                logger.debug("concatenate_logtables: cmdline\n"+cmd)                
+            subprocess.check_call(cmd, shell=True)      
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: RUN
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #         
@@ -715,8 +735,13 @@ class Pipeline :
         for f in os.listdir(log_dir):
             f_new=os.path.join(log_dir,string.replace(f,f.split('_')[0],self.prefix_pe[f.split('_')[0]]) )   
             f= os.path.join(log_dir ,f)          
-            os.rename(f,f_new)              
-       
+            os.rename(f,f_new)          
+        # clean dir
+        reads_distrib_dir = os.path.join(self.args.output_dir,"reads_distribution/")
+        try:
+            shutil.rmtree(reads_distrib_dir)
+        except OSError:
+            pass    
         
         
         

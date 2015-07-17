@@ -7,19 +7,15 @@ import re
 # CLASS: MONITORING
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 class Monitoring:
-    def __init__(self):
+    def __init__(self,tot_raw):
         self.reads = [0] * 6
+        self.reads[0]= tot_raw
         #{"raw","trimmed","phix","ncRNA","mapped","mapped_strict"}
-       
-    def count_raw_reads(self,trim_log):
-        f = open(trim_log,'r')
-        for line in f:
-            if "Input Read Pairs: " in line: 
-                reads = [int(x) for x in line.split(' ') if x.isdigit()]
-                #0:raw 1:both_surv 2:fwd_surv 3:rev_surv 4:dropped
-                break
-        f.close()
-        self.reads[0]=reads[0]
+    
+    def count_seq_fq(self,fastq_file):
+        return int(subprocess.check_output("wc -l %s"%(fastq_file), shell=True).split(' ')[0])/4
+    
+    def count_raw_reads(self):
         return self.reads[0]
         
     def count_processed_reads(self,trim_log):
@@ -39,8 +35,8 @@ class Monitoring:
         return self.reads[2]
     
     def count_non_ncRNA_reads(self,seq_paired_filtered, seq_single_filtered):
-        pairs  = int(subprocess.check_output("wc -l "+ seq_paired_filtered, shell=True).split(' ')[0])/4
-        singles= int(subprocess.check_output("wc -l "+ seq_single_filtered, shell=True).split(' ')[0])/4            
+        pairs  = self.count_seq_fq(seq_paired_filtered)
+        singles= self.count_seq_fq(seq_single_filtered)         
         self.reads[3]= pairs + singles  
         return self.reads[3]        
         
@@ -60,9 +56,9 @@ class Monitoring:
             self.reads[5]=mapped_reads
             return self.reads[5]
 
-    def get_tot_percentage(self,index):
-        tot_percentage = round(float(self.reads[index])/self.reads[0]*100,2) 
-        return str(tot_percentage)    
+    def get_tot_percentage(self,count_reads):
+        tot_percentage = round(float(count_reads)/self.reads[0]*100,2) 
+        return (str(tot_percentage)+' %')    
 
     def get_percentage_prev(self, index):
         if index >0:        
