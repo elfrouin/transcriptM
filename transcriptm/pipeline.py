@@ -210,11 +210,23 @@ class Pipeline :
                 logger.info("Trim and remove adapters of paired reads of %(input_files)s" % locals())
                 logger.debug("trimmomatic: cmdline\n"+ cmd)
             subprocess.check_call(cmd, shell=True)
-#            print ('\t').join([self.prefix_pe[os.path.basename(input_files[0]).split('_R1.fq.gz')[0]],'FastQC-check','raw reads','val','100.0','100.0'])
+            # monitoring of count reads            
+            name_sample = self.prefix_pe[os.path.basename(input_files[0]).split('_R1.fq.gz')[0]]
+            # dict stat: 
+                #keys  -> couple of paired-end files
+                #value -> monitoring object
+            stat = {} 
+            stat[name_sample]=Monitoring()
+            ## raw reads
+            raw_reads = stat[name_sample].count_raw_reads(log)
+            print ('\t').join([name_sample,'FastQC-check','raw reads',str(raw_reads),'100.00','100.00'])
+            ## processed reads
+            processed_reads = stat[name_sample].count_processed_reads(log)
+            print ('\t').join([name_sample,'Trimmomatic','raw reads',str(processed_reads),
+                               stat[name_sample].get_tot_percentage(processed_reads),
+                               stat[name_sample].get_percentage_prev(processed_reads)])
 
-          
-       
-        
+                  
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: STEP N_3
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #    
@@ -660,8 +672,8 @@ class Pipeline :
                       [header[1],"FastQC-check", "Trimmomatic","bamM make","SortMeRNA","bamM make"],
                       [header[2],"raw reads", "raw reads","processed reads","filtered reads","filtered reads"],
                       [header[3]]+map(str,stat.reads[:-1]) ,
-                      [header[4]]+map(str,stat.get_tot_percentage()[:-1]) ,
-                      [header[5]]+map(str,stat.get_percentage_prev()[:-1])])
+                      [header[4]]+map(str,stat.get_all_tot_percentage()[:-1]) ,
+                      [header[5]]+map(str,stat.get_all_percentage_prev()[:-1])])
                 numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s")                                  
             else:
                 stringency_filter_log= [f for f in input_files if re.search(r'stringency_filter.log', f)][0]  
@@ -680,8 +692,8 @@ class Pipeline :
                       [header[1],"FastQC-check", "Trimmomatic","bamM make","SortMeRNA","bamM make","bamM filter"],
                       [header[2],"raw reads", "raw reads","processed reads","filtered reads","filtered reads","mapped reads"],
                       [header[3]]+map(str,stat.reads) ,
-                      [header[4]]+map(str,stat.get_tot_percentage()) ,
-                      [header[5]]+map(str,stat.get_percentage_prev())])
+                      [header[4]]+map(str,stat.get_all_tot_percentage()) ,
+                      [header[5]]+map(str,stat.get_all_percentage_prev())])
                 numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s") 
        
 

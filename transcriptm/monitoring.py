@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+import subprocess
+import re
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 # CLASS: MONITORING
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -7,12 +10,72 @@ class Monitoring:
     def __init__(self):
         self.reads = [0] * 6
         #{"raw","trimmed","phix","ncRNA","mapped","mapped_strict"}
-   
-    def get_tot_percentage(self):
+       
+    def count_raw_reads(self,trim_log):
+        f = open(trim_log,'r')
+        for line in f:
+            if "Input Read Pairs: " in line: 
+                reads = [int(x) for x in line.split(' ') if x.isdigit()]
+                #0:raw 1:both_surv 2:fwd_surv 3:rev_surv 4:dropped
+                break
+        f.close()
+        self.reads[0]=reads[0]
+        return self.reads[0]
+        
+    def count_processed_reads(self,trim_log):
+        f = open(trim_log,'r')
+        for line in f:
+            if "Input Read Pairs: " in line: 
+                reads = [int(x) for x in line.split(' ') if x.isdigit()]
+                #0:raw 1:both_surv 2:fwd_surv 3:rev_surv 4:dropped
+                break
+        f.close()
+        self.reads[1]= sum(reads[1:4])        
+        return self.reads[1]        
+        
+    def count_non_Phix_reads(self, phix_ID_file):
+        phiX_reads = int(subprocess.check_output("wc -l "+phix_ID_file, shell=True).split(' ')[0])
+        self.reads[2]= self.reads[1]- phiX_reads   
+        return self.reads[2]
+    
+    def count_non_ncRNA_reads(self,seq_paired_filtered, seq_single_filtered):
+        pairs  = int(subprocess.check_output("wc -l "+ seq_paired_filtered, shell=True).split(' ')[0])/4
+        singles= int(subprocess.check_output("wc -l "+ seq_single_filtered, shell=True).split(' ')[0])/4            
+        self.reads[3]= pairs + singles  
+        return self.reads[3]        
+        
+    def count_mapping_reads(self,mapping_log,before_filter):
+        with open(mapping_log, 'r') as f:
+            for line in f:
+                if re.search('with itself and mate mapped',line):   
+                    pairs_mapped = int(line.split(' ')[0])
+                elif re.search('in total', line):
+                    total_mapped = int(line.split(' ')[0])
+            mapped_reads = pairs_mapped/2 +(total_mapped-pairs_mapped)
+            f.close()
+        if before_filter:
+            self.reads[4]=mapped_reads
+            return self.reads[4]
+        else:
+            self.reads[5]=mapped_reads
+            return self.reads[5]
+
+    def get_tot_percentage(self,index):
+        tot_percentage = round(float(self.reads[index])/self.reads[0]*100,2) 
+        return str(tot_percentage)    
+
+    def get_percentage_prev(self, index):
+        if index >0:        
+            prev_percentage = round(float(self.reads[index]) /self.reads[index-1]*100,2)
+            return str(prev_percentage)
+        else: 
+            raise Exception ("index must be >=1")
+    
+    def get_all_tot_percentage(self):
         tot_percentage = [round(float(x)/self.reads[0]*100,2) for x in self.reads]
         return tot_percentage
     
-    def get_percentage_prev(self):
+    def get_all_percentage_prev(self):
         prev_percentage =[0] * 6
         prev_percentage[0]=100.0
         for i in range(1,6):
