@@ -223,8 +223,8 @@ class Pipeline :
             ## processed reads
             processed_reads = stat[name_sample].count_processed_reads(log)
             print ('\t').join([name_sample,'Trimmomatic','raw reads',str(processed_reads),
-                               stat[name_sample].get_tot_percentage(processed_reads),
-                               stat[name_sample].get_percentage_prev(processed_reads)])
+                               stat[name_sample].get_tot_percentage(processed_reads,1),
+                               stat[name_sample].get_percentage_prev(processed_reads,1)])
 
                   
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
