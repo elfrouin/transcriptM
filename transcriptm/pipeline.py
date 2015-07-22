@@ -318,16 +318,16 @@ class Pipeline :
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: STEP N_4
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #    
-    # Third step in the QC process: remove rRNA
-        @subdivide(phiX_extract,formatter(), "{path[0]}/{basename[0]}_non_rRNA.fq",
-                   "{path[0]}/{basename[0]}_rRNA.fq",self.logger, self.logging_mutex)
-        def sortmerna (input_files, output_files, rRNA_files,logger, logging_mutex):    
+    # Third step in the QC process: remove rRNA, tRNA ...
+        @subdivide(phiX_extract,formatter(), "{path[0]}/{basename[0]}_non_ncRNA.fq",
+                   "{path[0]}/{basename[0]}_ncRNA.fq",self.logger, self.logging_mutex)
+        def sortmerna (input_files, output_files, ncRNA_files,logger, logging_mutex):    
             """
             SortMeRNA. Remove non-coding RNA
             """
             cmd= "sortmerna --ref %s --reads %s --aligned %s --other %s --fastx -a %d --log" %(self.args.path_db_smr,
                                                                                                input_files,
-                                                                                               rRNA_files.split('.fq')[0],
+                                                                                               ncRNA_files.split('.fq')[0],
                                                                                                output_files.split('.fq')[0],
                                                                                                self.args.threads)
             with logging_mutex:
@@ -472,7 +472,7 @@ class Pipeline :
         
         
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE: STEP N_6
+    # PIPELINE: STEP N_6 (fpkm)
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
     # fpkg if bins provided
         if self.args.no_mapping_filter :  
@@ -488,11 +488,8 @@ class Pipeline :
     ## add control! contigs in gff files must be present in metaG_contigs  ##
     #                                                                       #
             for i in range(len(self.list_gff)):
-                gff_no_fasta= tempfile.NamedTemporaryFile(prefix='transcriptm', suffix='.gff')
-                cmd0 = "sed '/^##FASTA$/,$d' %s > %s" %(self.list_gff[i], gff_no_fasta.name)
-                subprocess.check_call(cmd0, shell=True)
                 cmd ="dirseq --bam %s --gff %s --ignore-directions -q>  %s " %(input_file,
-                                                           gff_no_fasta.name,
+                                                           self.list_gff[i],
                                                            fpkg_file)
                 with logging_mutex:     
                     logger.info("Calculte fpkg from a bam file and the gff file ")  
@@ -514,13 +511,39 @@ class Pipeline :
                     logger.debug("bam2fpkm: cmdline\n"+ cmd1)
                 subprocess.check_call(cmd1, shell=True)                 
         
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    # PIPELINE: STEP N_6 BIS (raw count)
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
+    # raw count if bins provided
+        if self.args.no_mapping_filter :  
+            bam_file = map2ref 
+        else: 
+            bam_file= mapping_filter
+        @subdivide(bam_file,formatter(),'{path[0]}/*count.csv',self.list_gff,self.logger, self.logging_mutex)
+        def bam2raw_count(input_file, output_file, list_gff,logger, logging_mutex):
+            """
+            Bedtools (count the number of mapped reads per gene)
+            """                                                            #
+            for i in range(len(self.list_gff)):
+                gff_no_fasta= tempfile.NamedTemporaryFile(prefix='transcriptm', suffix='.gff')
+                cmd0 = "sed '/^##FASTA$/,$d' %s > %s" %(self.list_gff[i], gff_no_fasta.name)
+                subprocess.check_call(cmd0, shell=True)
+                cmd ="bedtools intersect -c -a %s -b %s -bed >  %s " %( gff_no_fasta.name,
+                                                                       input_file,
+                                                                       input_file.split('.bam')[0]+'_'+os.path.splitext(os.path.basename((self.list_gff[i])))[0] +'_count.csv')
+                with logging_mutex:     
+                    logger.info("Calculte raw count from a bam file and the gff file ")  
+                    logger.debug("bam2raw_count: cmdline\n"+ cmd)                                       
+                subprocess.check_call(cmd, shell=True)        
+
+ 
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE: STEP N_7
+    # PIPELINE: STEP N_7 (fpkm table)
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
-    # Concatenate all the results in a table
+    # Concatenate all the FPKM results in a table
         @mkdir(self.args.output_dir)
-        @merge(bam2fpkm,os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'.csv'),self.logger, self.logging_mutex)
+        @merge(bam2fpkm,os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_FPKM.csv'),self.logger, self.logging_mutex)
         def transcriptM_table (input_files, output_file, logger, logging_mutex): 
             """
             Create one table that contains RPKM values for each gene of each bin for the different samples
@@ -576,6 +599,72 @@ class Pipeline :
             with logging_mutex:     
                 logger.info("Create table that contains RPKM values for each gene of each bin given as input for the different samples")
             
+    
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    # PIPELINE: STEP N_7 BIS (raw count table)
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
+    # Concatenate all the raw count in a table
+        @mkdir(self.args.output_dir)
+        @merge(bam2raw_count,os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_COUNT.csv'),self.logger, self.logging_mutex)
+        def raw_count_table (input_files, output_file, logger, logging_mutex): 
+            """
+            Create one table that contains raw count values for each gene of each bin for the different samples
+            """
+            input_files=list(set(input_files))          
+            self.list_gff = list(numpy.sort(self.get_files(self.args.dir_bins ,'.gff')))
+            count_col= [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)]       
+            # headers of cols ->  0, n-1, n
+            count_col[0].append('bin_ID')
+            count_col[-2].append('gene location [contig:start:end]')
+            count_col[-1].append('annotation')      
+        
+#            bins_name =[os.path.splitext(os.path.basename((self.list_gff[i])))[0] for i in range(len(self.list_gff))]
+            bins_path =[os.path.splitext((self.list_gff[i]))[0] for i in range(len(self.list_gff))]
+            for b in bins_path :
+                files_b= [f for f in input_files if re.search('_'+os.path.basename(b)+'_count.csv', f)]  
+                # first col: bins_name
+                with open(files_b[0],'r') as csvfile:                    
+                        reader = csv.reader(csvfile, delimiter='\t') 
+                        next(reader)  # skip header 
+                        for row in reader:
+                            count_col[0].append(b+'.gff')
+                        csvfile.close() 
+                # n-1 col: gene location
+                with open(files_b[0],'r') as csvfile:                    
+                        reader = csv.reader(csvfile, delimiter='\t') 
+                        next(reader) # skip header 
+                        for row in reader:
+                            count_col[-2].append(row[0]+':'+row[3]+':'+row[4])
+                        csvfile.close() 
+                # n col: annotation
+                with open(files_b[0],'r') as csvfile:                    
+                        reader = csv.reader(csvfile, delimiter='\t') 
+                        next(reader) # skip header 
+                        for row in reader:
+                            try: 
+                                annotation = [x for x in row[8].split(";") if re.search('product',x)][0].split('=')[-1]
+                            except IndexError :
+                                annotation = 'unannotated'
+                            count_col[-1].append(annotation)
+                        csvfile.close() 
+                # remaining cols: count
+                for i in range(len(files_b)):
+                    # create header of count cols
+                    if not count_col[i+1]:
+                        count_col[i+1].append('Count_'+self.prefix_pe[os.path.basename(files_b[i]).split('_')[0]])
+                    with open(files_b[i],'r') as csvfile:                    
+                        reader = csv.reader(csvfile, delimiter='\t')                      
+                        next(reader) # skip header  
+                        for row in reader:
+                            count_col[i+1].append(row[7])
+                        csvfile.close() 
+         
+            tab = numpy.array(count_col)
+            numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s") 
+            
+            with logging_mutex:     
+                logger.info("Create table that contains raw count values for each gene of each bin given as input for the different samples")    
+    
     
     
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -655,7 +744,7 @@ class Pipeline :
      
         subdir_4= os.path.join(self.args.output_dir,"reads_distribution") 
         @mkdir(subdir_4)              
-        @collate(save_log,formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_rRNA)))).log$"),
+        @collate(save_log,formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
                  subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')
         def logtable (input_files,output_file,basename):
             """
@@ -665,7 +754,7 @@ class Pipeline :
             stat = Monitoring(self.tot_pe[name_sample])          
             # raw
             stat.reads[0]= stat.count_raw_reads()
-            #processed reads
+            # processed reads
             trimm_file = [f for f in input_files if re.search(r'trimmomatic.log', f)][0]     
             stat.reads[1]= stat.count_processed_reads(trimm_file)         
             # non phiX reads
