@@ -12,7 +12,7 @@ import tempdir
 # LOCAL IMPORT
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 from transcriptm.pipeline import Pipeline 
-import transcriptm.init
+import transcriptm.__init__
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 # MAIN
