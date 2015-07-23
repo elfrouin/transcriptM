@@ -24,7 +24,7 @@ if __name__ == '__main__':
     WHAT DOES THIS PIPELINE DO? \n
     process metatranscriptomic data and complete metagenomics analysis\n
     e.g. transcriptm --paired_end sample1-R1.fq.gz sample1-R2.fq.gz sample2-R1.fq.gz sample2-R2.fq.gz --metaG_contigs assembly.fa --dir_bins dir_gff
-    ''')
+    ''', version = "transcriptm v%s"% transcriptm.__version__)
 
     # Options   
     parser.add_argument("--paired_end",nargs="+", dest="paired_end", help="Input files: paired sequence files of raw metatranscriptomics reads (.fq.gz format)  e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz",required=True)
