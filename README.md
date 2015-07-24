@@ -41,8 +41,8 @@ optional arguments:
                         Input files: paired sequences files of raw metatranscriptomic reads (fq.gz format) 
                         e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz
   --metaG_contigs METAG_CONTIGS
-                        Fasta file which contain all contigs from the reference metagenome
-  --dir_bins DIR_BINS   Directory which contains several annotated bins 
+                        All contigs from the reference metagenome in a fasta file
+  --dir_bins DIR_BINS   Directory which contains several annotated population genomes (bins) 
                         -> gff format, the others files would be ignored
   --threads THREADS     Number of threads to use (default=20)
   --db_path DB_PATH     Directory which contains the TranscriptM databases
