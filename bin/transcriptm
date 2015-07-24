@@ -107,10 +107,10 @@ transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2
      
     # SortMeRNA
     sortmerna_args=parser.add_argument_group('SortMeRNA options')    
-    try :
-        path_rRNA = os.path.join(os.environ["TRANSCRIPTM_DATABASE"],"1-SortMeRNA/rRNA_databases")
-        path_tRNA= os.path.join(os.environ["TRANSCRIPTM_DATABASE"],"1-SortMeRNA/tRNA_databases")
-        path_index = os.path.join(os.environ["TRANSCRIPTM_DATABASE"],"1-SortMeRNA/index")
+    if db_path:
+        path_rRNA = os.path.join(db_path,"1-SortMeRNA/rRNA_databases")
+        path_tRNA= os.path.join(db_path,"1-SortMeRNA/tRNA_databases")
+        path_index = os.path.join(db_path,"1-SortMeRNA/index")
         db_smr = '%s/silva-bac-16s-id90.fasta,%s/silva-bac-16s-db:%s/silva-bac-23s-id98.fasta,%s/silva-bac-23s-db:'\
         '%s/silva-arc-16s-id95.fasta,%s/silva-arc-16s-db:%s/silva-arc-23s-id98.fasta,%s/silva-arc-23s-db:'\
         '%s/silva-euk-18s-id95.fasta,%s/silva-euk-18s-db:%s/silva-euk-28s-id98.fasta,%s/silva-euk-28s:'\
@@ -119,8 +119,8 @@ transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2
         '%s/rfam-cyano_tmRNA.fa,%s/rfam-cyano_tmRNA-db:%s/rfam-mt_tmRNA.fa,%s/rfam-mt_tmRNA-db:'\
         '%s/rfam-tmRNA.fa,%s/rfam-tmRNA-db:%s/rfam-tRNA.fa,%s/rfam-tRNA-db:'\
         '%s/rfam-tRNA_Sec.fa,%s/rfam-tRNA_Sec-db'%((path_rRNA,path_index)*8+(path_tRNA,path_index)*7)
-        sortmerna_args.add_argument('--path_db_smr',help="Path to databases and index\n e.g. path_db1,path_index1:path_db2,path_index2 (default: rRNA and tRNA db)\n NB: index must be created with the script sortmerna/2.0/bin/indexdb_rna",default = db_smr)
-    except KeyError:
+        sortmerna_args.add_argument('--path_db_smr',help="Path to databases and index\n e.g. path_db1,path_index1:path_db2,path_index2 [default: rRNA and tRNA db]\n NB: index must be created with the script sortmerna/2.0/bin/indexdb_rna",default = db_smr)
+    else :
         sortmerna_args.add_argument('--path_db_smr',help="Path to databases and index\n e.g. path_db1,path_index1:path_db2,path_index2\n NB: index must be created with the script sortmerna/2.0/bin/indexdb_rna",required=True)
 
 
