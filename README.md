@@ -38,12 +38,12 @@ $ transcriptm -h
 optional arguments:
   -h, --help            show this help message and exit
   --paired_end PAIRED_END [PAIRED_END ...]
-                        Input files: paired sequence files of raw metatranscriptomic reads (fq.gz format) 
+                        Input files: paired sequences files of raw metatranscriptomic reads (fq.gz format) 
                         e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz
   --metaG_contigs METAG_CONTIGS
-                        Fasta file which contain all contigd from the reference metagenome
-  --dir_bins DIR_BINS   Directory which contains several annotated bins 
-                        (gff format, the others files would be ignored)
+                        All contigs from the reference metagenome in a fasta file
+  --dir_bins DIR_BINS   Directory which contains several annotated population genomes (bins) 
+                        -> gff format, the others files would be ignored
   --threads THREADS     Number of threads to use (default=20)
   --db_path DB_PATH     Directory which contains the TranscriptM databases
   --output_dir OUTPUT_DIR
@@ -74,6 +74,6 @@ Mapping options (BamM filter):
                         Minimum allowable percentage base identity of a mapped read (default=0.97)
   --percentage_aln PERCENTAGE_ALN
                         Minimum allowable percentage read bases mapped (default=0.95)
-  --no_mapping_filter   Do not adjust the mapping srtingengy by filtering alignments (default=False)
+  --no_mapping_filter   Do not adjust the mapping srtingency by filtering alignments (default=False)
 
 ```
