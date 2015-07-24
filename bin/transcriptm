@@ -61,7 +61,7 @@ class CustomHelpFormatter(argparse.HelpFormatter):
 if __name__ == '__main__':
     parser = cmdline.get_argparse(description='''
                     ===============================                       
-                    |       transcriptM v%s       |
+                    |       transcriptM v%s      |
                     ===============================    
 
    -------------------------------------------------------------------------   
