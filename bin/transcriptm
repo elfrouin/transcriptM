@@ -37,10 +37,17 @@ class CustomHelpFormatter(argparse.HelpFormatter):
                         if not (type(action.default)==str and len(action.default)>50):
                             if '\n' in h:
                                 lines = h.splitlines()
-                                lines[0] += ' (default: %(default)s)'
+                                lines[0] += ' [default: %(default)s]'
                                 h = '\n'.join(lines)
                             else:
-                                h += ' (default: %(default)s)'
+                                h += ' [default: %(default)s]'
+        if action.required:
+            if '\n' in h:
+                lines = h.splitlines()
+                lines[0] += ' \033[0;32m|REQUIRED\033[00m'
+                h = '\n'.join(lines)
+            else:
+                h += ' \033[0;32m|REQUIRED\033[00m'
         return h
 
     def _fill_text(self, text, width, indent):
@@ -68,11 +75,10 @@ transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2
     ignored_args = ["recreate_database", "key_legend_in_graph","just_print","target_tasks","jobs","use_threads","forced_tasks","touch_files_only","checksum_file_name","flowchart","draw_graph_horizontally","flowchart_format"])
 
     # Options   
-    # required
-    required_args=parser.add_argument_group('required arguments')
-    required_args.add_argument("--paired_end",nargs="+", dest="paired_end", help="Input files: paired sequences files of raw metatranscriptomics reads (.fq.gz format)\n  e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz",required=True)
-    required_args.add_argument("--metaG_contigs", dest="metaG_contigs", help="All contigs from the reference metagenome in a fasta file",required=True)
-    required_args.add_argument("--dir_bins", dest="dir_bins", help="Directory which contains several annotated population genomes (bins)\n -> gff format, the others files would be ignored",required=True)
+    parser._optionals.title = "Arguments"
+    parser.add_argument("--paired_end",nargs="+", dest="paired_end", help="Input files: paired sequences files of raw metatranscriptomics reads (.fq.gz format)\n  e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz",required=True)
+    parser.add_argument("--metaG_contigs", dest="metaG_contigs", help="All contigs from the reference metagenome in a fasta file",required=True)
+    parser.add_argument("--dir_bins", dest="dir_bins", help="Directory which contains several annotated population genomes (bins)\n -> gff format, the others files would be ignored",required=True)
     parser.add_argument("--threads", dest="threads", help="Number of threads to use", default=20)
     
     # check if the db is an environment variable
@@ -84,7 +90,7 @@ transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2
     if db_path:
         parser.add_argument("--db_path", dest="db_path", help="Directory which contains the TranscriptM databases", default= db_path)
     else :
-        required_args.add_argument("--db_path", dest="db_path", help="Directory which contains the TranscriptM databases",required=True)
+        parser.add_argument("--db_path", dest="db_path", help="Directory which contains the TranscriptM databases",required=True)
     parser.add_argument("--output_dir", dest="output_dir", help="Output directory ", default='TranscriptM_output')
     tmpdir= tempdir.TempDir()
     parser.add_argument("--working_dir", dest="working_dir", help="Working directory", default= tmpdir.name)
