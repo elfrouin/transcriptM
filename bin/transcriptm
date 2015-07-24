@@ -68,9 +68,9 @@ transcriptm --paired_end sample1-1.fq.gz sample1-2.fq.gz sample2-1.fq.gz sample2
     ignored_args = ["recreate_database", "key_legend_in_graph","just_print","target_tasks","jobs","use_threads","forced_tasks","touch_files_only","checksum_file_name","flowchart","draw_graph_horizontally","flowchart_format"])
 
     # Options   
-    parser.add_argument("--paired_end",nargs="+", dest="paired_end", help="Input files: paired sequence files of raw metatranscriptomics reads (.fq.gz format)\n  e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz",required=True)
-    parser.add_argument("--metaG_contigs", dest="metaG_contigs", help="Fasta file which contain all contigd from the reference metagenome",required=True)
-    parser.add_argument("--dir_bins", dest="dir_bins", help="Directory which contains several annotated bins\n -> gff format, the others files would be ignored",required=True)
+    parser.add_argument("--paired_end",nargs="+", dest="paired_end", help="Input files: paired sequences files of raw metatranscriptomics reads (.fq.gz format)\n  e.g. --paired_end sample1_1.fq.gz sample1_2.fq.gz sample2_1.fq.gz sample2_2.fq.gz",required=True)
+    parser.add_argument("--metaG_contigs", dest="metaG_contigs", help="All contigs from the reference metagenome in a fasta file",required=True)
+    parser.add_argument("--dir_bins", dest="dir_bins", help="Directory which contains several annotated population genomes (bins)\n -> gff format, the others files would be ignored",required=True)
     parser.add_argument("--threads", dest="threads", help="Number of threads to use", default=20)
     
     # check if the db is an environment variable
