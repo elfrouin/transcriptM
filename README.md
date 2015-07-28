@@ -22,6 +22,7 @@ transcriptm --paired_end sample1-R1.fq.gz sample1-R2.fq.gz sample2-R1.fq.gz samp
 * samtools    (v0.1.19)
 * numpy       (v1.9.1)
 * dirseq      (v0.0.2)
+* bedtools    (v2.20.1)
 * tempdir     (v0.6)
 
 ## Databases
