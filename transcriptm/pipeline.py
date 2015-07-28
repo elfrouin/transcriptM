@@ -48,6 +48,9 @@ class Pipeline :
         
         # gff files
         self.list_gff = list(numpy.sort(self.get_files(self.args.dir_bins ,'.gff')))
+        if len(set([os.path.basename(x) for x in self.list_gff]))<len(self.list_gff):
+            raise Exception ("--dir_bins args \nWarning: some gff files have the same name")
+            exit(1)
 
         # prefix
         self.alias_pe = {}        
@@ -244,7 +247,7 @@ class Pipeline :
                                                                                  self.args.working_dir,
                                                                                  self.args.threads)
             with logging_mutex:
-                logger.info("Map reads against phiX genome")
+                logger.info("Map reads [%s] against phiX genome"%(','.join(input_files)))
                 logger.debug("phiX_map: cmdline\n"+ cmd)
             subprocess.check_call(cmd, shell=True)
             
@@ -271,7 +274,7 @@ class Pipeline :
                                         input_files[2],
                                         output_file)
             with logging_mutex:
-                logger.info("Concatenate in ONE file all ID of phiX reads")
+                logger.info("Concatenate all ID of phiX reads [%s]"%(','.join(input_files)))
                 logger.debug("phiX_concat_ID: cmdline\n"+ cmd)
             subprocess.check_call(cmd, shell=True) 
            
@@ -300,14 +303,14 @@ class Pipeline :
             try:
                 cmd ="fxtract -S -H -f %s -z -v %s > %s" %(input_files[1], input_files[0],output_files)
                 with logging_mutex:
-                    logger.info("Extract phiX reads in the data")
+                    logger.info("Extract phiX reads in the file %s"%(input_files[0]))
                     logger.debug("phiX_extract: cmdline\n"+ cmd)
                 subprocess.check_call(cmd, shell=True) 
             #flag -z if gzip input file
             except subprocess.CalledProcessError:
                 cmd ="gzip  -cd %s > %s" %(input_files[0],output_files)
                 with logging_mutex:
-                    logger.info("No phiX reads in one sample ")
+                    logger.info("No phiX reads in the file: %s"%(input_files[0]))
                     logger.debug("phiX_extract: cmdline\n"+ cmd)
                 subprocess.check_call(cmd, shell=True) 
 
@@ -331,7 +334,7 @@ class Pipeline :
                                                                                                output_files.split('.fq')[0],
                                                                                                self.args.threads)
             with logging_mutex:
-                logger.info("Remove reads with sortMeRNA")
+                logger.info("Remove reads with SortMeRNA in %(input_files)s"%locals())
                 logger.debug("sortmerna: cmdline\n"+ cmd)
             subprocess.check_call(cmd, shell=True)
     
@@ -362,15 +365,15 @@ class Pipeline :
                                                                               input_files[1],
                                                                               output_files[2])
             with logging_mutex:
-                logger.info("Find IDs of single reads generated with SortMeRNA")
+                logger.info("Find IDs of single reads generated with SortMeRNA in (%s,%s)" %(input_files[0], input_files[1]))
                 logger.debug("concat_mapping: cmdline\n"+ cmd_ID)            
             subprocess.check_call(['bash','-c',cmd_ID])
             with logging_mutex:
-                logger.info("Prepare paired reads files for the mapping")
+                logger.info("Prepare paired reads files for the mapping (%s,%s)" %(input_files[0], input_files[1]))
                 logger.debug("concat_mapping: cmdline\n"+ cmd_paired)  
             subprocess.check_call(cmd_paired, shell=True)
             with logging_mutex:
-                logger.info("Prepare single reads files for the mapping")
+                logger.info("Prepare single reads files for the mapping (%s,%s)" %(input_files[2], input_files[3]))
                 logger.debug("concat_mapping: cmdline\n"+ cmd_single)  
             subprocess.check_call(cmd_single, shell=True)
         
@@ -411,19 +414,19 @@ class Pipeline :
                                                                             self.args.threads,
                                                                             index_exists) 
             with logging_mutex:     
-                logger.info("Map reads to the reference metagenome")
+                logger.info("Map reads [%s] to the reference metagenome %s"%(",".join(input_files[0]),input_files[1]))
                 logger.debug("map2ref: cmdline\n"+ cmd)  
             subprocess.check_call(cmd, shell=True)
             
             cmd2= "samtools merge -f %s %s %s ; samtools view -b -F2304 %s > %s " %(bams[2],bams[0],bams[1],bams[2],output_file)
             with logging_mutex:     
-                logger.info("Concatenate .bam files ")
+                logger.info("Concatenate %s and %s"%(bams[0],bams[1]))
                 logger.debug("map2ref: cmdline\n"+ cmd2)  
             subprocess.check_call(cmd2, shell=True)
                 
             cmd3= "samtools flagstat %s > %s " %(output_file,flagstat)
             with logging_mutex:     
-                logger.info("Compute statistics of .bam file (samtools flastat)")
+                logger.info("Compute statistics of %(output_file)s (samtools flastat)"%locals())
                 logger.debug("map2ref: cmdline\n"+ cmd3)  
             subprocess.check_call(cmd3, shell=True)
     
@@ -489,10 +492,12 @@ class Pipeline :
     #                                                                       #
             for i in range(len(self.list_gff)):
                 cmd ="dirseq --bam %s --gff %s --ignore-directions -q>  %s " %(input_file,
-                                                           self.list_gff[i],
-                                                           fpkg_file)
+                                                                               self.list_gff[i],
+                                                                               fpkg_file)
+#                except subprocess.CalledProcessError:
+#                    cmd = "awk '/^[^#]/ { print $1 }'"
                 with logging_mutex:     
-                    logger.info("Calculte fpkg from a bam file and the gff file ")  
+                    logger.info("Calculte fpkg from %s and %s"%(input_file,self.list_gff[i]))  
                     logger.debug("bam2fpkm: cmdline\n"+ cmd)                                       
                 subprocess.check_call(cmd, shell=True)        
 
@@ -501,10 +506,10 @@ class Pipeline :
                 if lib_size !=0:
                     cmd1= "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e9}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " %(fpkg_file,
                                                                                                                        lib_size,
-                                                                                                                       input_file.split('.bam')[0]+'_'+os.path.splitext(os.path.basename((self.list_gff[i])))[0] +'_fpkm.csv',
+                                                                                                                       input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_fpkm.csv',
                                                                                                                        fpkg_file )
                 else:
-                    cmd1= "cp %s %s; rm %s "%(fpkg_file,input_file.split('.bam')[0]+'_'+os.path.splitext(os.path.basename((self.list_gff[i])))[0] +'_fpkm.csv',fpkg_file)
+                    cmd1= "cp %s %s; rm %s "%(fpkg_file,input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_fpkm.csv',fpkg_file)
                     
                 with logging_mutex:     
                     logger.info("Convert fpkg to fpkm")
@@ -532,7 +537,7 @@ class Pipeline :
                                                                        input_file,
                                                                        input_file.split('.bam')[0]+'_'+os.path.splitext(os.path.basename((self.list_gff[i])))[0] +'_count.csv')
                 with logging_mutex:     
-                    logger.info("Calculte raw count from a bam file and the gff file ")  
+                    logger.info("Calculte raw count from %s and %s "%(input_file,gff_no_fasta.name))  
                     logger.debug("bam2raw_count: cmdline\n"+ cmd)                                       
                 subprocess.check_call(cmd, shell=True)        
 
@@ -549,7 +554,6 @@ class Pipeline :
             Create one table that contains RPKM values for each gene of each bin for the different samples
             """
             input_files=list(set(input_files))          
-            self.list_gff = list(numpy.sort(self.get_files(self.args.dir_bins ,'.gff')))
             fpkm_col= [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)]       
             # headers of cols ->  0, n-1, n
             fpkm_col[0].append('bin_ID')
@@ -583,7 +587,7 @@ class Pipeline :
                         csvfile.close() 
                 # remaining cols: FPKM
                 for i in range(len(files_b)):
-                    # create header of RPKM cols
+                    # create header of FPKM cols
                     if not fpkm_col[i+1]:
                         fpkm_col[i+1].append('FPKM_'+self.prefix_pe[os.path.basename(files_b[i]).split('_')[0]])
                     with open(files_b[i],'r') as csvfile:                    
@@ -597,7 +601,7 @@ class Pipeline :
             numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s") 
             
             with logging_mutex:     
-                logger.info("Create table that contains RPKM values for each gene of each bin given as input for the different samples")
+                logger.info("Create table that contains RPKM values for each gene of each bin given as input for the different samples: %s"%(','.join(self.prefix_pe.values())))    
             
     
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -611,7 +615,6 @@ class Pipeline :
             Create one table that contains raw count values for each gene of each bin for the different samples
             """
             input_files=list(set(input_files))          
-            self.list_gff = list(numpy.sort(self.get_files(self.args.dir_bins ,'.gff')))
             count_col= [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)]       
             # headers of cols ->  0, n-1, n
             count_col[0].append('bin_ID')
@@ -663,7 +666,7 @@ class Pipeline :
             numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s") 
             
             with logging_mutex:     
-                logger.info("Create table that contains raw count values for each gene of each bin given as input for the different samples")    
+                logger.info("Create table that contains raw count values for each gene of each bin given as input for the different samples: %s"%(','.join(self.prefix_pe.values())))    
     
     
     
@@ -762,8 +765,8 @@ class Pipeline :
             stat.reads[2]= stat.count_non_Phix_reads(phix_ID_file) 
             # non rRNA/tRNA/tmRNA reads
             list_fqfiles= self.get_files(self.args.working_dir,'.fq')
-            pairs_filtered= [f for f in list_fqfiles if re.search(r'concat_paired_R1.fq', f)][0]
-            singles_filtered= [f for f in list_fqfiles if re.search(r'concat_single.fq', f)][0]
+            pairs_filtered= [f for f in list_fqfiles if re.search(r'%s.+concat_paired_R1.fq'%(basename), f)][0]
+            singles_filtered= [f for f in list_fqfiles if re.search(r'%s.+concat_single.fq'%(basename), f)][0]
             stat.reads[3]= stat.count_non_ncRNA_reads(pairs_filtered,singles_filtered)    
             # mapped reads
             mapping_log= [f for f in input_files if re.search(r'mapping.log', f)][0]  
