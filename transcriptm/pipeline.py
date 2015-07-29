@@ -182,7 +182,21 @@ class Pipeline :
             with logging_mutex:
                 logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
             self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
-            
+        
+        # check if bwa index are present 
+        @active_if(self.has_index(self.args.metaG_contigs,['.amb','.bwt','.ann','.pac','.sa']))
+        @mkdir(self.args.working_dir)        
+        @transform([self.args.metaG_contigs+x for x in ['.amb','.bwt','.ann','.pac','.sa'] ], formatter(),
+                        # move to working directory
+                        os.path.join(self.args.working_dir,"{basename[0]}{ext[0]}"),
+                        self.logger, self.logging_mutex)
+        def symlink_to_wd_metaG_index (input_file, soft_link_name, logger, logging_mutex):
+            """
+            Make soft link in working directory
+            """
+            with logging_mutex:
+                logger.info("Linking files %(input_file)s -> %(soft_link_name)s" % locals())
+            self.re_symlink(input_file, soft_link_name, logger, logging_mutex)
             
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: STEP N_2
@@ -492,10 +506,8 @@ class Pipeline :
     #                                                                       #
             for i in range(len(self.list_gff)):
                 cmd ="dirseq --bam %s --gff %s --ignore-directions -q>  %s " %(input_file,
-                                                                               self.list_gff[i],
-                                                                               fpkg_file)
-#                except subprocess.CalledProcessError:
-#                    cmd = "awk '/^[^#]/ { print $1 }'"
+                                                                           self.list_gff[i],
+                                                                           fpkg_file)
                 with logging_mutex:     
                     logger.info("Calculte fpkg from %s and %s"%(input_file,self.list_gff[i]))  
                     logger.debug("bam2fpkm: cmdline\n"+ cmd)                                       
@@ -504,7 +516,7 @@ class Pipeline :
                 lib_size= int(subprocess.check_output("samtools view -c "+input_file, shell=True))
                 
                 if lib_size !=0:
-                    cmd1= "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e9}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " %(fpkg_file,
+                    cmd1= "sed 's/\t/|/g' %s | q  -F '|' 'NR>=2 {$6= $6/%d*10e9}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " %(fpkg_file,
                                                                                                                        lib_size,
                                                                                                                        input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_fpkm.csv',
                                                                                                                        fpkg_file )
@@ -592,7 +604,7 @@ class Pipeline :
                         fpkm_col[i+1].append('FPKM_'+self.prefix_pe[os.path.basename(files_b[i]).split('_')[0]])
                     with open(files_b[i],'r') as csvfile:                    
                         reader = csv.reader(csvfile, delimiter='\t')                      
-                        next(reader) # skip header  
+                        next(reader) # skip header  q
                         for row in reader:
                             fpkm_col[i+1].append(row[5])
                         csvfile.close() 
@@ -659,7 +671,7 @@ class Pipeline :
                         reader = csv.reader(csvfile, delimiter='\t')                      
                         next(reader) # skip header  
                         for row in reader:
-                            count_col[i+1].append(row[7])
+                            count_col[i+1].append(row[9])
                         csvfile.close() 
          
             tab = numpy.array(count_col)
