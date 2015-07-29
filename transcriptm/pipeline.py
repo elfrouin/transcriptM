@@ -516,7 +516,7 @@ class Pipeline :
                 lib_size= int(subprocess.check_output("samtools view -c "+input_file, shell=True))
                 
                 if lib_size !=0:
-                    cmd1= "sed 's/\t/|/g' %s | q  -F '|' 'NR>=2 {$6= $6/%d*10e9}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " %(fpkg_file,
+                    cmd1= "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e9}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " %(fpkg_file,
                                                                                                                        lib_size,
                                                                                                                        input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_fpkm.csv',
                                                                                                                        fpkg_file )
@@ -604,7 +604,7 @@ class Pipeline :
                         fpkm_col[i+1].append('FPKM_'+self.prefix_pe[os.path.basename(files_b[i]).split('_')[0]])
                     with open(files_b[i],'r') as csvfile:                    
                         reader = csv.reader(csvfile, delimiter='\t')                      
-                        next(reader) # skip header  q
+                        next(reader) # skip header  
                         for row in reader:
                             fpkm_col[i+1].append(row[5])
                         csvfile.close() 
