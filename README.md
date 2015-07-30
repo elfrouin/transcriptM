@@ -14,6 +14,7 @@
 transcriptm --paired_end sample1-R1.fq.gz sample1-R2.fq.gz sample2-R1.fq.gz sample2-R2.fq.gz --metaG_contigs assembly.fa --dir_bins dir_gff
 ```
 ## Dependencies
+* ruffus      (v2.6.3)
 * fastqc      (v0.10.1)
 * trimmomatic (v0.32)
 * bamm        (v1.5.0)
