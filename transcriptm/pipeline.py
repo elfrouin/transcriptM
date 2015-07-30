@@ -360,7 +360,7 @@ class Pipeline :
         #-move the singleton (generated with sortmerna) with the single ones
         @collate(sortmerna,regex(r"trimm_.*"),["concat_paired_R1.fq","concat_paired_R2.fq","concat_single.fq"],
                  "ID_single.txt", self.logger, self.logging_mutex)
-        def concat_mapping(input_files, output_files,ID_single,logger, logging_mutex):
+        def concat_for_mapping(input_files, output_files,ID_single,logger, logging_mutex):
             """
             Prepare .fq files for the mapping stage
             """
@@ -380,15 +380,15 @@ class Pipeline :
                                                                               output_files[2])
             with logging_mutex:
                 logger.info("Find IDs of single reads generated with SortMeRNA in (%s,%s)" %(input_files[0], input_files[1]))
-                logger.debug("concat_mapping: cmdline\n"+ cmd_ID)            
+                logger.debug("concat_for_mapping: cmdline\n"+ cmd_ID)            
             subprocess.check_call(['bash','-c',cmd_ID])
             with logging_mutex:
                 logger.info("Prepare paired reads files for the mapping (%s,%s)" %(input_files[0], input_files[1]))
-                logger.debug("concat_mapping: cmdline\n"+ cmd_paired)  
+                logger.debug("concat_for_mapping: cmdline\n"+ cmd_paired)  
             subprocess.check_call(cmd_paired, shell=True)
             with logging_mutex:
                 logger.info("Prepare single reads files for the mapping (%s,%s)" %(input_files[2], input_files[3]))
-                logger.debug("concat_mapping: cmdline\n"+ cmd_single)  
+                logger.debug("concat_for_mapping: cmdline\n"+ cmd_single)  
             subprocess.check_call(cmd_single, shell=True)
         
             #  ~~~~ monitoring: count of reads  ~~~~ #     
@@ -404,7 +404,7 @@ class Pipeline :
         # WARNINGS
         #1. .bam files generated with 'BamM' only contain the mapped reads -> be carful with the interpretation of samtools flagstat
         #2. only one alignment per read is kept: the secondary and supplementary are removed
-        @transform(concat_mapping,formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"),
+        @transform(concat_for_mapping,formatter(r"(.+)/(?P<BASE>.*)_concat_paired_R1.fq"),
                    add_inputs(symlink_to_wd_metaG),"{path[0]}/{BASE[0]}.bam",
                    ["{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[0]}.bam",
                     "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
@@ -572,7 +572,6 @@ class Pipeline :
             fpkm_col[-2].append('gene location [contig:start:end]')
             fpkm_col[-1].append('annotation')      
         
-#            bins_name =[os.path.splitext(os.path.basename((self.list_gff[i])))[0] for i in range(len(self.list_gff))]
             bins_path =[os.path.splitext((self.list_gff[i]))[0] for i in range(len(self.list_gff))]
             for b in bins_path :
                 files_b= [f for f in input_files if re.search('_'+os.path.basename(b)+'_fpkm.csv', f)]  
@@ -633,7 +632,6 @@ class Pipeline :
             count_col[-2].append('gene location [contig:start:end]')
             count_col[-1].append('annotation')      
         
-#            bins_name =[os.path.splitext(os.path.basename((self.list_gff[i])))[0] for i in range(len(self.list_gff))]
             bins_path =[os.path.splitext((self.list_gff[i]))[0] for i in range(len(self.list_gff))]
             for b in bins_path :
                 files_b= [f for f in input_files if re.search('_'+os.path.basename(b)+'_count.csv', f)]  
@@ -698,9 +696,10 @@ class Pipeline :
             """
             Create a fastQC report in the ouptut directory
             """
-            cmd ="fastqc %s -o %s --noextract --threads %d --quiet" %(input_file,
+            cmd ="fastqc %s -o %s --threads %d --quiet; rm %s/*.zip" %(input_file,
                                                                       subdir_1, 
-                                                                      self.args.threads )
+                                                                      self.args.threads,
+                                                                      subdir_1)
             with logging_mutex:
                 logger.info("Create a fastqc report of raw %(input_file)s" % locals())
                 logger.debug("view_raw_data: cmdline\n"+cmd)
@@ -722,9 +721,10 @@ class Pipeline :
             """
             Create a fastQC report in the ouptut directory
             """
-            cmd ="fastqc %s -o %s --noextract --threads %d --quiet" %(' '.join(input_file),
+            cmd ="fastqc %s -o %s --threads %d --quiet; rm %s/*.zip" %(' '.join(input_file),
                                                                       subdir_2, 
-                                                                      self.args.threads )
+                                                                      self.args.threads,
+                                                                      subdir_2 )
 
             with logging_mutex:
                 logger.info("Create a fastqc report of processed %(input_file)s" % locals())
@@ -821,7 +821,33 @@ class Pipeline :
             with logging_mutex:
                 logger.info("Concatenate summaries: %(input_files)s" % locals())
                 logger.debug("concatenate_logtables: cmdline\n"+cmd)                
-            subprocess.check_call(cmd, shell=True)      
+            subprocess.check_call(cmd, shell=True)  
+            
+            
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    # PIPELINE:TRACE FILE N_4
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
+    # save the processed metaT reads
+        subdir_4 = os.path.join(self.args.output_dir,"processed_reads/")
+        @mkdir(subdir_4)
+        @transform(concat_for_mapping, formatter(),
+                        # move to output directory
+                        os.path.join(subdir_4,"{basename[0]}{ext[0]}"),
+                        self.logger, self.logging_mutex)
+           
+        def save_processed_reads (input_file, output_file, logger, logging_mutex):
+            """
+            Copy the processed reads in the ouptut directory
+            """
+            cmd ="cp %s %s " %(input_file,output_file )
+
+            with logging_mutex:
+                logger.info("Copy the processed reads %(input_file)s in the ouptut directory" % locals())
+                logger.debug("save_processed_reads: cmdline\n"+cmd)
+            subprocess.check_call(cmd, shell=True)
+    
+
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: RUN
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #         
@@ -833,13 +859,26 @@ class Pipeline :
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # CLEAR FUNCTION: rename files ...
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #            
+    def rename_files(self, directory):
+    # rename all files in a directory with their 'real name'
+        for f in os.listdir(directory):
+            f_new=os.path.join(directory,string.replace(f,f.split('_')[0],self.prefix_pe[f.split('_')[0]]) )   
+            f= os.path.join(directory ,f)          
+            os.rename(f,f_new)        
+        
     def clear(self):  
     # rename logfile
         log_dir = os.path.join(self.args.output_dir,"log/")
-        for f in os.listdir(log_dir):
-            f_new=os.path.join(log_dir,string.replace(f,f.split('_')[0],self.prefix_pe[f.split('_')[0]]) )   
-            f= os.path.join(log_dir ,f)          
-            os.rename(f,f_new)          
+        self.rename_files(log_dir)          
+    # rename fastqc report
+        fastqc_raw = os.path.join(self.args.output_dir,"FastQC_raw/")
+        self.rename_files(fastqc_raw) 
+    # rename fastqc report
+        fastqc_processed = os.path.join(self.args.output_dir,"FastQC_processed/")
+        self.rename_files(fastqc_processed)
+    # rename processed reads
+        processed_dir =os.path.join(self.args.output_dir,"processed_reads/")
+        self.rename_files(processed_dir)
         # clean dir
         reads_distrib_dir = os.path.join(self.args.output_dir,"reads_distribution/")
         try:
