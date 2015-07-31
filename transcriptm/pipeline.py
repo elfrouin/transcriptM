@@ -489,17 +489,17 @@ class Pipeline :
         
         
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE: STEP N_6 (fpkm)
+    # PIPELINE: STEP N_6 (normalized_cov)
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
     # coverage if bins provided
         if self.args.no_mapping_filter :  
             bam_file = map2ref 
         else: 
             bam_file= mapping_filter
-        @subdivide(bam_file,formatter(),'{path[0]}/*fpkm.csv','{path[0]}/coverage.csv' ,'{path[0]}/{basename[0]}_lib_size.log',self.args.dir_bins,self.logger, self.logging_mutex)
-        def bam2fpkm(input_file, output_file,coverage_file,lib_size_log, dir_bins,logger, logging_mutex):
+        @subdivide(bam_file,formatter(),'{path[0]}/*normalized_cov.csv','{path[0]}/coverage.csv' ,'{path[0]}/{basename[0]}_lib_size.log',self.args.dir_bins,self.logger, self.logging_mutex)
+        def bam2normalized_cov(input_file, output_file,coverage_file,lib_size_log, dir_bins,logger, logging_mutex):
             """
-            Dirseq (compute coverage values) +  coverage2fpkm
+            Dirseq (compute coverage values) +  coverage2normalized_cov
             """
     #                                                                       #
     ## add control! contigs in gff files must be present in metaG_contigs  ##
@@ -515,20 +515,20 @@ class Pipeline :
                                                                            coverage_file)
                 with logging_mutex:     
                     logger.info("Calculte coverage from %s and %s"%(input_file,self.list_gff[i]))  
-                    logger.debug("bam2fpkm: cmdline\n"+ cmd)                                       
+                    logger.debug("bam2normalized_cov: cmdline\n"+ cmd)                                       
                 subprocess.check_call(cmd, shell=True)        
                 
                 if lib_size !=0:
                     cmd1= "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e6}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " %(coverage_file,
                                                                                                                        lib_size,
-                                                                                                                       input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_fpkm.csv',
+                                                                                                                       input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_normalized_cov.csv',
                                                                                                                        coverage_file )
                 else:
-                    cmd1= "cp %s %s; rm %s "%(coverage_file,input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_fpkm.csv',coverage_file)
+                    cmd1= "cp %s %s; rm %s "%(coverage_file,input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_normalized_cov.csv',coverage_file)
                     
                 with logging_mutex:     
-                    logger.info("Convert coverage to fpkm")
-                    logger.debug("bam2fpkm: cmdline\n"+ cmd1)
+                    logger.info("Convert coverage to normalized_cov")
+                    logger.debug("bam2normalized_cov: cmdline\n"+ cmd1)
                 subprocess.check_call(cmd1, shell=True)                 
         
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -559,63 +559,63 @@ class Pipeline :
  
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-    # PIPELINE: STEP N_7 (fpkm table)
+    # PIPELINE: STEP N_7 (normalized_cov table)
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
-    # Concatenate all the FPKM results in a table
+    # Concatenate all the normalized_cov results in a table
         @mkdir(self.args.output_dir)
-        @merge(bam2fpkm,os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_FPKM.csv'),self.logger, self.logging_mutex)
+        @merge(bam2normalized_cov,os.path.join(self.args.output_dir,os.path.basename(self.args.output_dir)+'_NORM_COVERAGE.csv'),self.logger, self.logging_mutex)
         def transcriptM_table (input_files, output_file, logger, logging_mutex): 
             """
             Create one table that contains RPKM values for each gene of each bin for the different samples
             """
             input_files=list(set(input_files))          
-            fpkm_col= [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)]       
+            normalized_cov_col= [list([]) for _ in xrange(int(len(self.args.paired_end)/2)+3)]       
             # headers of cols ->  0, n-1, n
-            fpkm_col[0].append('bin_ID')
-            fpkm_col[-2].append('gene location [contig:start:end]')
-            fpkm_col[-1].append('annotation')      
+            normalized_cov_col[0].append('bin_ID')
+            normalized_cov_col[-2].append('gene location [contig:start:end]')
+            normalized_cov_col[-1].append('annotation')      
         
             bins_path =[os.path.splitext((self.list_gff[i]))[0] for i in range(len(self.list_gff))]
             for b in bins_path :
-                files_b= [f for f in input_files if re.search('_'+os.path.basename(b)+'_fpkm.csv', f)]  
+                files_b= [f for f in input_files if re.search('_'+os.path.basename(b)+'_normalized_cov.csv', f)]  
                 # first col: bins_name
                 with open(files_b[0],'r') as csvfile:                    
                         reader = csv.reader(csvfile, delimiter='\t') 
                         next(reader)  # skip header 
                         for row in reader:
-                            fpkm_col[0].append(b+'.gff')
+                            normalized_cov_col[0].append(b+'.gff')
                         csvfile.close() 
                 # n-1 col: gene location
                 with open(files_b[0],'r') as csvfile:                    
                         reader = csv.reader(csvfile, delimiter='\t') 
                         next(reader) # skip header 
                         for row in reader:
-                            fpkm_col[-2].append(row[0]+':'+row[2]+':'+row[3])
+                            normalized_cov_col[-2].append(row[0]+':'+row[2]+':'+row[3])
                         csvfile.close() 
                 # n col: annotation
                 with open(files_b[0],'r') as csvfile:                    
                         reader = csv.reader(csvfile, delimiter='\t') 
                         next(reader) # skip header 
                         for row in reader:
-                            fpkm_col[-1].append(row[6])
+                            normalized_cov_col[-1].append(row[6])
                         csvfile.close() 
-                # remaining cols: FPKM
+                # remaining cols: normalized_cov
                 for i in range(len(files_b)):
-                    # create header of FPKM cols
-                    if not fpkm_col[i+1]:
-                        fpkm_col[i+1].append('FPKM_'+self.prefix_pe[os.path.basename(files_b[i]).split('_')[0]])
+                    # create header of normalized_cov cols
+                    if not normalized_cov_col[i+1]:
+                        normalized_cov_col[i+1].append('normalized_cov_'+self.prefix_pe[os.path.basename(files_b[i]).split('_')[0]])
                     with open(files_b[i],'r') as csvfile:                    
                         reader = csv.reader(csvfile, delimiter='\t')                      
                         next(reader) # skip header  
                         for row in reader:
-                            fpkm_col[i+1].append(row[5])
+                            normalized_cov_col[i+1].append(row[5])
                         csvfile.close() 
          
-            tab = numpy.array(fpkm_col)
+            tab = numpy.array(normalized_cov_col)
             numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s") 
             
             with logging_mutex:     
-                logger.info("Create table that contains FPKM values for each gene of each bin given as input for the different samples: %s"%(','.join(self.prefix_pe.values())))    
+                logger.info("Create table that contains normalized_cov values for each gene of each bin given as input for the different samples: %s"%(','.join(self.prefix_pe.values())))    
             
     
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -689,7 +689,7 @@ class Pipeline :
             shutil.rmtree(subdir_1)
         except OSError:
             pass          
-        @follows(bam2fpkm)
+        @follows(bam2normalized_cov)
         @mkdir(subdir_1)
         @transform(symlink_to_wd_metaT, formatter(),
                         # move to output directory
@@ -719,7 +719,7 @@ class Pipeline :
             shutil.rmtree(subdir_2)
         except OSError:
             pass          
-        @follows(bam2fpkm)
+        @follows(bam2normalized_cov)
         @mkdir(subdir_2)
         @transform(trimmomatic, formatter(),
                         # move to output directory
@@ -750,7 +750,7 @@ class Pipeline :
             shutil.rmtree(subdir_3)
         except OSError:
             pass        
-        @follows(bam2fpkm)
+        @follows(bam2normalized_cov)
         @mkdir(subdir_3)
         @transform(self.args.working_dir+'/*.log', formatter(".log"),  
                    os.path.join(subdir_3,"{basename[0]}"+".log"),
