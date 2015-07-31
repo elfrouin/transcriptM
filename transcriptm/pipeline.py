@@ -408,7 +408,7 @@ class Pipeline :
                    add_inputs(symlink_to_wd_metaG),"{path[0]}/{BASE[0]}.bam",
                    ["{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[0]}.bam",
                     "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".{basename[2]}.bam",
-                    "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+".merged.bam"],
+                    "{path[0]}/"+os.path.splitext(os.path.basename(self.args.metaG_contigs))[0]+"{BASE[0]}_merged.bam"],
                     "{path[0]}/{BASE[0]}_mapping.log",self.logger, self.logging_mutex)
         def map2ref (input_files, output_file, bams,flagstat,logger,logging_mutex):
             """
@@ -491,40 +491,43 @@ class Pipeline :
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # PIPELINE: STEP N_6 (fpkm)
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
-    # fpkg if bins provided
+    # coverage if bins provided
         if self.args.no_mapping_filter :  
             bam_file = map2ref 
         else: 
             bam_file= mapping_filter
-        @subdivide(bam_file,formatter(),'{path[0]}/*fpkm.csv','{path[0]}/fpkg.csv' ,self.args.dir_bins,self.logger, self.logging_mutex)
-        def bam2fpkm(input_file, output_file,fpkg_file, dir_bins,logger, logging_mutex):
+        @subdivide(bam_file,formatter(),'{path[0]}/*fpkm.csv','{path[0]}/coverage.csv' ,'{path[0]}{basename[0]}_lib_size.log',self.args.dir_bins,self.logger, self.logging_mutex)
+        def bam2fpkm(input_file, output_file,coverage_file,lib_size_log, dir_bins,logger, logging_mutex):
             """
-            Dirseq (compute fpkg values) +  fpkg2fpkm
+            Dirseq (compute coverage values) +  coverage2fpkm
             """
     #                                                                       #
     ## add control! contigs in gff files must be present in metaG_contigs  ##
-    #                                                                       #
+    #                   
+            lib_size= int(subprocess.check_output("samtools view -c "+input_file, shell=True))
+            f = open(lib_size_log, 'w')
+            f.write(str(lib_size)) 
+            f.close()                                                                #
+
             for i in range(len(self.list_gff)):
                 cmd ="dirseq --bam %s --gff %s --ignore-directions -q>  %s " %(input_file,
                                                                            self.list_gff[i],
-                                                                           fpkg_file)
+                                                                           coverage_file)
                 with logging_mutex:     
-                    logger.info("Calculte fpkg from %s and %s"%(input_file,self.list_gff[i]))  
+                    logger.info("Calculte coverage from %s and %s"%(input_file,self.list_gff[i]))  
                     logger.debug("bam2fpkm: cmdline\n"+ cmd)                                       
                 subprocess.check_call(cmd, shell=True)        
-
-                lib_size= int(subprocess.check_output("samtools view -c "+input_file, shell=True))
                 
                 if lib_size !=0:
-                    cmd1= "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e9}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " %(fpkg_file,
+                    cmd1= "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e9}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " %(coverage_file,
                                                                                                                        lib_size,
                                                                                                                        input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_fpkm.csv',
-                                                                                                                       fpkg_file )
+                                                                                                                       coverage_file )
                 else:
-                    cmd1= "cp %s %s; rm %s "%(fpkg_file,input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_fpkm.csv',fpkg_file)
+                    cmd1= "cp %s %s; rm %s "%(coverage_file,input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_fpkm.csv',coverage_file)
                     
                 with logging_mutex:     
-                    logger.info("Convert fpkg to fpkm")
+                    logger.info("Convert coverage to fpkm")
                     logger.debug("bam2fpkm: cmdline\n"+ cmd1)
                 subprocess.check_call(cmd1, shell=True)                 
         
@@ -612,7 +615,7 @@ class Pipeline :
             numpy.savetxt(output_file,numpy.transpose(tab),delimiter='\t', fmt="%s") 
             
             with logging_mutex:     
-                logger.info("Create table that contains RPKM values for each gene of each bin given as input for the different samples: %s"%(','.join(self.prefix_pe.values())))    
+                logger.info("Create table that contains FPKM values for each gene of each bin given as input for the different samples: %s"%(','.join(self.prefix_pe.values())))    
             
     
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -638,21 +641,18 @@ class Pipeline :
                 # first col: bins_name
                 with open(files_b[0],'r') as csvfile:                    
                         reader = csv.reader(csvfile, delimiter='\t') 
-                        next(reader)  # skip header 
                         for row in reader:
                             count_col[0].append(b+'.gff')
                         csvfile.close() 
                 # n-1 col: gene location
                 with open(files_b[0],'r') as csvfile:                    
                         reader = csv.reader(csvfile, delimiter='\t') 
-                        next(reader) # skip header 
                         for row in reader:
                             count_col[-2].append(row[0]+':'+row[3]+':'+row[4])
                         csvfile.close() 
                 # n col: annotation
                 with open(files_b[0],'r') as csvfile:                    
                         reader = csv.reader(csvfile, delimiter='\t') 
-                        next(reader) # skip header 
                         for row in reader:
                             try: 
                                 annotation = [x for x in row[8].split(";") if re.search('product',x)][0].split('=')[-1]
@@ -667,7 +667,6 @@ class Pipeline :
                         count_col[i+1].append('Count_'+self.prefix_pe[os.path.basename(files_b[i]).split('_')[0]])
                     with open(files_b[i],'r') as csvfile:                    
                         reader = csv.reader(csvfile, delimiter='\t')                      
-                        next(reader) # skip header  
                         for row in reader:
                             count_col[i+1].append(row[9])
                         csvfile.close() 
@@ -685,6 +684,11 @@ class Pipeline :
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # Create the first output: a fastqc report of raw DATA
         subdir_1= os.path.join(self.args.output_dir,"FastQC_raw")
+        # clean the dir (of previous run output)
+        try:
+            shutil.rmtree(subdir_1)
+        except OSError:
+            pass          
         @follows(bam2fpkm)
         @mkdir(subdir_1)
         @transform(symlink_to_wd_metaT, formatter(),
@@ -710,6 +714,11 @@ class Pipeline :
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     # Create the second output: a fastqc report of processed DATA
         subdir_2 = os.path.join(self.args.output_dir,"FastQC_processed")
+        # clean the dir (of previous run output)
+        try:
+            shutil.rmtree(subdir_2)
+        except OSError:
+            pass          
         @follows(bam2fpkm)
         @mkdir(subdir_2)
         @transform(trimmomatic, formatter(),
@@ -759,7 +768,7 @@ class Pipeline :
      
         subdir_4= os.path.join(self.args.output_dir,"reads_distribution") 
         @mkdir(subdir_4)              
-        @collate(save_log,formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
+        @collate(save_log,formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(lib_size)|(mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
                  subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')
         def logtable (input_files,output_file,basename):
             """
@@ -829,22 +838,30 @@ class Pipeline :
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
     # save the processed metaT reads
         subdir_4 = os.path.join(self.args.output_dir,"processed_reads/")
+        # clean the dir (of previous run output)
+        try:
+            shutil.rmtree(subdir_4)
+        except OSError:
+            pass  
         @mkdir(subdir_4)
         @transform(concat_for_mapping, formatter(),
                         # move to output directory
-                        os.path.join(subdir_4,"{basename[0]}{ext[0]}"),
+                        [os.path.join(subdir_4,"{basename[0]}{ext[0]}"),
+                        os.path.join(subdir_4,"{basename[1]}{ext[1]}"),
+                        os.path.join(subdir_4,"{basename[2]}{ext[2]}")],
                         self.logger, self.logging_mutex)
            
         def save_processed_reads (input_file, output_file, logger, logging_mutex):
             """
             Copy the processed reads in the ouptut directory
             """
-            cmd ="cp %s %s " %(input_file,output_file )
+            for i in range(3):
+                cmd ="cp %s %s " %(input_file[i],output_file[i] )
 
-            with logging_mutex:
-                logger.info("Copy the processed reads %(input_file)s in the ouptut directory" % locals())
-                logger.debug("save_processed_reads: cmdline\n"+cmd)
-            subprocess.check_call(cmd, shell=True)
+                with logging_mutex:
+                    logger.info("Copy the processed reads %s in the ouptut directory" %(input_file[i]))
+                    logger.debug("save_processed_reads: cmdline\n"+cmd)
+                subprocess.check_call(cmd, shell=True)
     
 
 
