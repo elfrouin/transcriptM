@@ -13,6 +13,20 @@
 ```sh
 transcriptm --paired_end sample1-R1.fq.gz sample1-R2.fq.gz sample2-R1.fq.gz sample2-R2.fq.gz --metaG_contigs assembly.fa --dir_bins dir_gff
 ```
+## What does it produce ?
+* **FastQC_raw**
+  - Fastqc reports of raw reads
+* **FastQC_processed**
+  - Fastqc reports of processed reads
+* TranscriptM_output_COUNT.csv  
+  - Raw count of mapped reads per gene (provided in gff files)
+* TranscriptM_output_NORM_COVERAGE.csv 
+  - Average coverage of mapped reads per gene (provided in gff files) normalized by the total of mapped reads 
+* **log**
+  - Log file of each step
+* summary_reads
+  - Distribution of reads after each step (IMPORTANT: the unit is paired-end reads)
+
 ## Dependencies
 * ruffus      (v2.6.3)
 * fastqc      (v0.10.1)
