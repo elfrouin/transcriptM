@@ -496,7 +496,7 @@ class Pipeline :
             bam_file = map2ref 
         else: 
             bam_file= mapping_filter
-        @subdivide(bam_file,formatter(),'{path[0]}/*fpkm.csv','{path[0]}/coverage.csv' ,'{path[0]}{basename[0]}_lib_size.log',self.args.dir_bins,self.logger, self.logging_mutex)
+        @subdivide(bam_file,formatter(),'{path[0]}/*fpkm.csv','{path[0]}/coverage.csv' ,'{path[0]}/{basename[0]}_lib_size.log',self.args.dir_bins,self.logger, self.logging_mutex)
         def bam2fpkm(input_file, output_file,coverage_file,lib_size_log, dir_bins,logger, logging_mutex):
             """
             Dirseq (compute coverage values) +  coverage2fpkm
@@ -519,7 +519,7 @@ class Pipeline :
                 subprocess.check_call(cmd, shell=True)        
                 
                 if lib_size !=0:
-                    cmd1= "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e9}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " %(coverage_file,
+                    cmd1= "sed 's/\t/|/g' %s | awk  -F '|' 'NR>=2 {$6= $6/%d*10e6}1' OFS='|' |  sed 's/|/\t/g' > %s ; rm %s " %(coverage_file,
                                                                                                                        lib_size,
                                                                                                                        input_file.split('.bam')[0]+'_'+ os.path.splitext(os.path.basename((self.list_gff[i])))[0]+'_fpkm.csv',
                                                                                                                        coverage_file )
