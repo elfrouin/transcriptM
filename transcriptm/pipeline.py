@@ -496,8 +496,8 @@ class Pipeline :
             bam_file = map2ref 
         else: 
             bam_file= mapping_filter
-        @subdivide(bam_file,formatter(),'{path[0]}/*normalized_cov.csv','{path[0]}/coverage.csv' ,'{path[0]}/{basename[0]}_lib_size.log',self.args.dir_bins,self.logger, self.logging_mutex)
-        def bam2normalized_cov(input_file, output_file,coverage_file,lib_size_log, dir_bins,logger, logging_mutex):
+        @subdivide(bam_file,formatter(),'{path[0]}/*normalized_cov.csv','{path[0]}/coverage.csv' ,self.args.dir_bins,self.logger, self.logging_mutex)
+        def bam2normalized_cov(input_file, output_file,coverage_file, dir_bins,logger, logging_mutex):
             """
             Dirseq (compute coverage values) +  coverage2normalized_cov
             """
@@ -505,9 +505,9 @@ class Pipeline :
     ## add control! contigs in gff files must be present in metaG_contigs  ##
     #                   
             lib_size= int(subprocess.check_output("samtools view -c "+input_file, shell=True))
-            f = open(lib_size_log, 'w')
-            f.write(str(lib_size)) 
-            f.close()                                                                #
+            #f = open(lib_size_log, 'w')
+            #f.write(str(lib_size)) 
+            #f.close()                                                                #
 
             for i in range(len(self.list_gff)):
                 cmd ="dirseq --bam %s --gff %s --ignore-directions -q>  %s " %(input_file,
@@ -768,7 +768,7 @@ class Pipeline :
      
         subdir_4= os.path.join(self.args.output_dir,"reads_distribution") 
         @mkdir(subdir_4)              
-        @collate(save_log,formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(filtered_lib_size)|(lib_size)|(mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
+        @collate(save_log,formatter(r"/log/(?P<BASE>.*)_((stringency_filter)|(mapping)|(trimmomatic)|(trimm_((phiX_ID)|((U|P)(1|2)_phiX_ext_ncRNA)))).log$"),
                  subdir_4+"/{BASE[0]}_reads_stat",'{BASE[0]}')
         def logtable (input_files,output_file,basename):
             """
